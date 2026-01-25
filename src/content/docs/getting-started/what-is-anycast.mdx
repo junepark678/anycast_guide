@@ -3,33 +3,34 @@ title: What is Anycast? | How Anycast Routing Works
 description: Learn what anycast routing is and how it works. Understand the difference between anycast and unicast, common use cases, and why DIY anycast is achievable for hobbyists.
 ---
 
-import { LinkCard } from '@astrojs/starlight/components';
+import { LinkCard, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 Anycast is a network addressing and routing methodology where a single IP address is announced from multiple locations simultaneously. When a user connects to an anycast address, they're automatically routed to the nearest (or best) instance based on BGP routing metrics.
 
-{/* TODO: Add an introductory paragraph with a real-world analogy to make anycast intuitive for beginners */}
+When you buy a product from Amazon.com, you don't care which warehouse it ships from; as long as it arrives quickly, you get the same product at your doorstep. Anycast works similarly for internet services: users are directed to the closest server hosting the service, improving performance and reliability. This works particularly well for stateless services like DNS, CDN edge nodes, and DDoS mitigation.
 
 ## How Anycast Works
 
 At its core, anycast leverages the Border Gateway Protocol (BGP) to announce the same IP prefix from multiple points of presence (PoPs) around the world. The internet's routing infrastructure naturally directs traffic to the topologically closest announcement.
 
-{/* TODO: Detailed explanation of BGP announcements and path selection */}
+At each PoP, a BGP announcement is made for the anycast IP prefix. Routers across the internet receive these announcements and build their routing tables accordingly. Generally, routers will prefer the path with the shortest Autonomous System (AS) path length, effectively routing users to the nearest (in network topology) server.
 
-### The Role of BGP
-
-BGP is the protocol that makes anycast possible. Each of your servers announces the same IP prefix to their upstream providers, and the global routing table propagates these announcements.
-
-{/* TODO: Explain BGP path selection, AS path length, and how traffic finds the "nearest" server */}
-
-### Traffic Flow in Anycast
-
-When a client sends a packet to your anycast IP, their ISP's routers consult the BGP routing table and forward the packet along the shortest AS path.
-
-{/* TODO: Step-by-step walkthrough of a packet's journey in an anycast network */}
+<Aside type="note">
+TL;DR: Anycast is just making multiple BGP announcements for the same prefix, resulting in natural load balancing and redundancy.
+</Aside>
 
 ## Anycast vs Unicast
 
 Understanding the difference between anycast and unicast is fundamental to grasping why anycast is powerful for certain applications.
+
+<Tabs>
+  <TabItem label="Unicast">
+    Unicast is the traditional method of network communication where a single unique IP address corresponds to a single device. When you connect to a unicast address, your traffic is routed to that specific device, regardless of its location.
+  </TabItem>
+  <TabItem label="Anycast">
+    Anycast, on the other hand, allows multiple devices to share the same IP address.
+  </TabItem>
+</Tabs>
 
 {/* TODO: Comparison table showing unicast vs anycast characteristics */}
 
