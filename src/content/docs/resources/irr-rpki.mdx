@@ -1,0 +1,206 @@
+---
+title: "IRR & RPKI Setup"
+description: "Set up Internet Routing Registry objects and RPKI ROA records for your anycast network. Essential route security and registration for BGP announcements."
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Before announcing your IP prefixes via BGP, you need to register them properly. This guide covers both the Internet Routing Registry (IRR) and Resource Public Key Infrastructure (RPKI)—two complementary systems that validate your authority to announce routes.
+
+## Why Route Registration Matters
+
+Route registration serves two purposes: proving you're authorized to announce prefixes, and protecting against route hijacking.
+
+Most providers use IRR and RPKI data to filter incoming BGP announcements. Without proper registration, your routes may be ignored or rejected. Even if your direct upstream accepts unregistered routes, transit providers further downstream may filter them out, resulting in connectivity issues or traffic blackholing.
+
+### The Two Systems
+
+**IRR** and **RPKI** are two distinct but complementary systems:
+
+#### IRR (Internet Routing Registry)
+
+IRR is a decentralized database where network operators publish their routing intentions. It allows providers to verify which ASNs are authorized to announce specific prefixes. Generally, IRR data is maintained via text-based objects in databases like the RIPE Database or RADB.
+
+#### RPKI (Resource Public Key Infrastructure)
+
+RPKI is a cryptographic system that provides verifiable proof of route origin authorization. It uses digital certificates to link IP prefixes to ASNs, allowing routers to validate BGP announcements cryptographically. RPKI helps prevent route hijacking by ensuring only authorized ASNs can announce specific prefixes. Unless you are using independent resources, you generally cannot use the RIR's RPKI system directly; instead, your LIR sponsor will manage this for you via delegation or on your behalf.
+
+<Aside type="caution">
+Many hosting providers and networks now require valid RPKI ROAs before accepting your BGP announcements. Setting up IRR and RPKI isn't optional—it's a prerequisite for getting your routes accepted.
+</Aside>
+
+## Internet Routing Registry (IRR) Basics
+
+IRR is a distributed database system where network operators publish their routing intentions. Generally, you use the database associated with your RIR (e.g., RIPE DB for RIPE resources). Other popular IRR databases include RADB.
+
+IRR entries are made using structured text objects that define your ASN, prefixes, and relationships. These are used by providers to filter and validate BGP announcements. Below are based generally on the RIPE Database, but concepts apply broadly.
+
+### Key Object Types
+
+#### aut-num - Your ASN registration
+The aut-num object defines your ASN and contains contact information, routing policies, and other metadata. This is the foundational object for your network in the IRR. These are generally managed by the RIR and are not availible to be created by end users.
+
+#### route/route6 - Prefix Authorization
+The route (for IPv4) and route6 (for IPv6) objects specify which prefixes your ASN is authorized to announce. Each route object links a prefix to your ASN. You must control `mnt-ref` (maintainer reference) for both the aut-num and prefix to create or modify these objects.
+
+#### organization - Your Organization Info
+The organization object contains details about your organization, including name, address, and contact information. It is linked to your aut-num object.
+
+#### as-set - Grouping of ASNs
+The as-set object allows you to group multiple ASNs together. This is useful for defining routing policies that apply to multiple networks. Your aut-num object can be part of many as-sets, and you may be added to as-sets by other networks, even without `mnt-ref`.
+
+#### mntner - Authentication for Updates
+The mntner object defines maintainers who have permission to create or modify objects in the IRR. It includes authentication methods (passwords, PGP keys) to secure updates.
+
+#### poem - When Engineers Are Poets
+> A poem object contains a poem that is submitted by a user. It has no operational use and reflects the humorous side of industry representatives. (Source: RIPE Database Docs)
+
+Network engineering is highly taxing work, and requires highly serious poetry to keep the DNS issues away.
+
+## Creating Objects Example: route/route6
+
+Route objects (route for IPv4, route6 for IPv6) declare which ASN is authorized to originate a prefix.
+
+### Route Object Structure
+
+```txt
+route6:        fc00:600::/32
+descr:         Route
+origin:        AS3333
+mnt-by:        CHILD-MB-MNT
+components:    protocol BGP4 { 0:0:0:0:1:1:1:1/10^+}
+               protocol OSPF { 0:0:0:0:1:1:1:1/12^+}
+inject:        at 1.2.3.4 action pref=100; upon HAVE-COMPONENTS { 0:0:0:0:1:1:1:1/0, 0:0:0:0:1:1:1:1/0 }
+inject:        at rtrs-myset:AS2:rtrs-test:AS777234
+inject:        at AS777234:rtrs-myset:AS2:rtrs-test:AS7777234
+inject:        action community = {65535:295};
+inject:        action community = {65535:20};
+inject:        upon HAVE-COMPONENTS {::/8}
+export-comps:  { fc00:600::/48 }
+holes:         fc00:600::/48, fc00:600::/56, fc00:600::/64
+aggr-bndry:    AS771234:AS-mytest:AS3:AS-test:AS775234
+aggr-mtd:      outbound AS771234:AS-mytest:AS3:AS-test:AS775234
+member-of:     AS200200:rs-test
+member-of:     AS3333:rs-test
+mnt-routes:    LIR-MNT { fc00:600::/36^+, fc00:600::/36^-, fc00:600::/16^36-48, fc00:600::/16^42, fc00:600::/56}
+mnt-routes:    LIR2-MNT      anY
+created:       1970-01-01T00:00:00Z
+last-modified: 2012-01-01T15:30:45Z
+source:        TEST
+```
+(source: RIPE Database Docs)
+
+This is an example of a route6 object. Key fields include:
+- `descr` - Description of the route
+- `origin` - The ASN authorized to announce the prefix
+- `mnt-by` - The maintainer with permission to modify this object
+- `created` and `last-modified` - Timestamps for tracking changes
+- `source` - The IRR database source (e.g., RIPE, RADB)
+
+
+### Creating Objects in RIPE Database
+
+1. **Log into RIPE Portal**: Access the [RIPE NCC portal](https://apps.db.ripe.net/) with your credentials.
+2. **Navigate to RIR Database**: Go to the "Create an Object" menu in the "RIPE Database" section.
+3. **Select appropriate object type**: Choose `route` or `route6` for your prefixes.
+4. **Fill in required fields**: Complete the form with your prefix, origin ASN, maintainer, and other relevant details.
+5. **Submit the object**: Review and submit the object for creation. You may need to authenticate using your maintainer credentials.
+
+## Common IRR Databases
+
+Multiple IRR databases exist, and providers may query different ones.
+
+### RIPE DB
+
+This is the official database for RIPE NCC resources. It is free to use and widely adopted in Europe and beyond.
+
+(https://apps.db.ripe.net/)
+
+### RADB
+
+RADB is a popular global IRR database used by many networks worldwide. It is independent of any RIR and accepts route objects for resources from multiple RIRs. It is operated by Merit Network and requires payment for updates.
+
+### Others
+
+Other IRR databases include:
+- **APNIC IRR** (Asia Pacific)
+- **ARIN IRR** (North America)
+- **LACNIC IRR** (Latin America and Caribbean)
+- **AFRINIC IRR** (Africa)
+
+
+
+<Aside type="tip">
+If your resources are from RIPE (common for sponsored allocations), use the RIPE database. It's free and authoritative for RIPE resources.
+</Aside>
+
+## RPKI Fundamentals
+
+RPKI provides cryptographic proof that you're authorized to announce specific prefixes from your ASN.
+
+The RPKI system uses a hierarchy of digital certificates to validate route origin. Certificates are issued by RIRs to LIRs, who can then create Route Origin Authorizations (ROAs) for their prefixes. Generally, you must have an independent resource to create RPKI certificates directly; otherwise, your LIR sponsor will have to delegate or manage this on your behalf. These ROAs are published and can be fetched by RPKI validators, which routers query to validate BGP announcements. Routes without valid ROAs may be rejected or deprioritized by networks enforcing RPKI validation.
+
+### RPKI Adoption
+
+RPKI adoption is growing rapidly. Many major ISPs and transit providers now require valid ROAs for route acceptance. Implementing RPKI helps protect your network from route hijacking and improves the likelihood that your announcements will be accepted.
+
+## Creating ROA Records
+
+A ROA authorizes your ASN to announce specific prefixes with defined maximum prefix lengths. We recommend using [Krill](https://www.nlnetlabs.nl/projects/routing/krill/) for managing RPKI ROAs, as it supports multiple RIRs and is user-friendly.
+
+### ROA Parameters
+
+You will need the following information to create a ROA:
+- Prefix: The IP prefix you want to authorize (e.g., 2001:db8::/48)
+- Origin ASN: Your Autonomous System Number (e.g., AS65536)
+- Max Length: The maximum prefix length that can be announced (important for anycast)
+
+<Aside type="caution" title="Max Length Warning">
+Setting max length higher than your announced prefix opens you to sub-prefix hijacking attacks. For a /48 you announce as /48, set max length to 48—not 128.
+</Aside>
+
+### Krill usage
+After installing and configuring Krill, you can create ROAs via the web interface. You must get the certificates for the resources delegated to you by your LIR sponsor. Your ASN is generally considered PI and should be manageable directly by you in the RIR portal. PA prefixes require your LIR sponsor to delegate RPKI management to you. You can generally achieve this by contacting your sponsor and requesting RPKI delegation. You will need to share your Krill public key (in the form of an XML file) with them so they can delegate the resources to you.
+
+## Validating Your Setup
+
+After creating IRR objects and ROAs, verify everything is working correctly.
+
+### Checking IRR Registration
+
+You can use whois queries to check your IRR objects. For example, to check a route6 object in the RIPE Database:
+
+```bash
+# Example: Check route6 object
+whois -h whois.ripe.net 2001:db8::/48
+```
+
+### Checking RPKI Status
+
+Use an RPKI validator or online tools like [RPKI Validator](https://rpki-validator.ripe.net/) to check the status of your ROAs.
+
+### Common Issues
+
+- **IRR Object Not Found**: Ensure you have the correct maintainer permissions and that the object was created successfully.
+- **RPKI Validation Fails**: Double-check your ROA parameters, especially the prefix and origin ASN.
+- **Propagation Delay**: Both IRR and RPKI changes may take time to propagate through the network. This can range from seconds to hours depending on the system.
+
+<Aside>
+RPKI propagation can take 15-60 minutes after creating a ROA. If validation fails immediately after creation, wait and try again before troubleshooting.
+</Aside>
+
+## Next Steps
+
+With your routes properly registered, you're ready to configure BGP sessions with providers.
+
+<LinkCard
+  title="Provider Requirements"
+  description="Learn what providers need from you to establish BGP sessions."
+  href="/resources/provider-requirements/"
+/>
+
+<LinkCard
+  title="BIRD Configuration Guide"
+  description="Set up BIRD to announce your registered prefixes."
+  href="/guides/bird/"
+/>

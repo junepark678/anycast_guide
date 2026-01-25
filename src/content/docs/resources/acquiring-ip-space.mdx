@@ -1,0 +1,57 @@
+---
+title: "Acquiring IP Space"
+description: "Learn how to obtain IP address space for anycast networking. Compare RIR allocation, LIR sponsorship, and IP brokers to find the best path for your project."
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Getting your own IP address space is a foundational step for running an anycast network. This guide walks you through the various paths to obtaining IP addresses, from working directly with Regional Internet Registries to purchasing from brokers.
+
+## Understanding IP Address Allocation
+
+IP addresses are a finite resource managed through a hierarchical system. Understanding how allocation works helps you navigate the process more effectively.
+
+The global IP address space is managed by IANA, which allocates large blocks to Regional Internet Registries (RIRs). RIRs then allocate smaller blocks to Local Internet Registries (LIRs) or end users. Currently, there are five RIRs that manage the global IP space by region:
+- ARIN (North America)
+- RIPE NCC (Europe, Middle East, Central Asia)
+- APNIC (Asia Pacific)
+- LACNIC (Latin America and Caribbean)
+- AFRINIC (Africa)
+
+For the purposes of this guide, we will focus on obtaining IP space in ARIN or RIPE NCC regions, as they are the most common for hobbyists and small organizations.
+
+<Aside>
+You don't need to use the RIR for your geographic region. Many hobbyists obtain RIPE resources through sponsorship regardless of where they're located, as RIPE has well-established sponsorship processes.
+</Aside>
+
+Most RIRs require by policy that IP address space be allocated in the minimum sizes of /24 for IPv4 and /48 for IPv6. Notably, a /24 is the smallest IPv4 prefix and a /48 is the smallest IPv6 prefix that is generally accepted for global BGP announcement.
+
+## RIR vs LIR Sponsorship
+
+There are two primary paths to obtaining IP space: becoming a member of a Regional Internet Registry yourself, or working through a Local Internet Registry (LIR) sponsor. For the scope of this guide, we focus on LIR sponsorship as the practical choice for most hobbyists and small organizations.
+
+### LIR Sponsorship
+
+An LIR is an organization that is a member of an RIR and can allocate IP address space to its customers. Many LIRs are often ISPs or other network providers. By working with an sponsor, you can obtain your own IP prefixes and ASNs without the overhead of direct RIR membership. Some popular LIR sponsors include:
+- Lagrange Cloud (https://lagrange.cloud/)
+- iFog (https://ifog.ch/)
+
+<Aside type="tip" title="PI vs PA Space">
+When obtaining IP space, you may encounter two terms: Provider Independent (PI) and Provider Aggregate (PA). PI space is assigned directly to you and can be announced from any provider. It is especially useful when you have to switch providers, as you are generally able to transfer it to a different sponsoring LIR. PA space is tied to a specific LIR but are generally cheaper than PI space, due to the lack of independent resource provisioning from the RIR.
+</Aside>
+
+## Next Steps
+
+Once you have IP space, you'll need an ASN to announce it via BGP.
+
+<LinkCard
+  title="Getting an ASN"
+  description="Learn how to obtain an Autonomous System Number for your network."
+  href="/resources/acquiring-asn/"
+/>
+
+<LinkCard
+  title="IRR & RPKI Setup"
+  description="Register your routes and secure them with RPKI."
+  href="/resources/irr-rpki/"
+/>

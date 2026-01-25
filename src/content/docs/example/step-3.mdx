@@ -1,0 +1,308 @@
+---
+title: "Step 3: BGP Setup"
+description: "Configure BIRD 2.x for BGP routing on your anycast nodes. Complete configuration example with templates and filters."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps, Code } from '@astrojs/starlight/components';
+
+Now that your resources are registered, it's time to configure BGP on your servers. We'll use BIRD 2.x for this example, configuring it to announce your anycast prefixes.
+
+## Server Preparation
+
+Before configuring BIRD, prepare your server:
+
+<Steps>
+1. **Install BIRD 2.x**
+   ```bash
+   # Debian/Ubuntu
+   sudo apt update && sudo apt install bird2
+   
+   # Verify installation
+   bird --version
+   ```
+
+2. **Configure the loopback interface**
+   
+   Add your anycast IPs to the loopback interface:
+   ```bash
+   # Add IPv4 anycast address
+   sudo ip addr add 203.0.113.1/32 dev lo
+   
+   # Add IPv6 anycast address
+   sudo ip addr add 2001:db8:abcd::1/128 dev lo
+   ```
+
+3. **Make addresses persistent**
+   
+   Add to `/etc/network/interfaces` or use netplan:
+   ```
+   auto lo
+   iface lo inet loopback
+       up ip addr add 203.0.113.1/32 dev lo
+       up ip addr add 2001:db8:abcd::1/128 dev lo
+   ```
+</Steps>
+
+<Aside>
+Anycast addresses are added to the loopback interface because they don't correspond to a physical network segment. The routing daemon handles directing traffic to these addresses.
+</Aside>
+
+## BIRD Configuration
+
+Create your BIRD configuration at `/etc/bird/bird.conf`:
+
+```bird
+# /etc/bird/bird.conf
+# Example Anycast Configuration for AS212345
+
+# ============================================
+# Global Configuration
+# ============================================
+
+# Router ID - use your server's primary IPv4 address
+router id 192.0.2.10;
+
+# Logging
+log syslog all;
+log "/var/log/bird.log" { warning, error, fatal };
+
+# Graceful restart
+graceful restart wait 15;
+
+# ============================================
+# Variables
+# ============================================
+
+define MY_ASN = 212345;
+define MY_IPv4 = 203.0.113.0/24;
+define MY_IPv6 = 2001:db8:abcd::/48;
+
+# ============================================
+# Common Functions
+# ============================================
+
+function is_my_prefix_v4() {
+    if net = MY_IPv4 then return true;
+    return false;
+}
+
+function is_my_prefix_v6() {
+    if net = MY_IPv6 then return true;
+    return false;
+}
+
+# ============================================
+# Protocols
+# ============================================
+
+# Device protocol - required
+protocol device {
+    scan time 10;
+}
+
+# Direct protocol - learn routes from interfaces
+protocol direct {
+    ipv4;
+    ipv6;
+    interface "lo";
+}
+
+# Kernel protocol - sync to kernel routing table
+protocol kernel kernel_v4 {
+    ipv4 {
+        export all;
+        import none;
+    };
+}
+
+protocol kernel kernel_v6 {
+    ipv6 {
+        export all;
+        import none;
+    };
+}
+
+# Static routes for our anycast prefixes
+protocol static static_anycast_v4 {
+    ipv4;
+    route MY_IPv4 blackhole;
+}
+
+protocol static static_anycast_v6 {
+    ipv6;
+    route MY_IPv6 blackhole;
+}
+
+# ============================================
+# BGP Templates
+# ============================================
+
+template bgp upstream_v4 {
+    local as MY_ASN;
+    hold time 90;
+    keepalive time 30;
+    graceful restart on;
+    
+    ipv4 {
+        import none;
+        export filter {
+            if is_my_prefix_v4() then accept;
+            reject;
+        };
+    };
+}
+
+template bgp upstream_v6 {
+    local as MY_ASN;
+    hold time 90;
+    keepalive time 30;
+    graceful restart on;
+    
+    ipv6 {
+        import none;
+        export filter {
+            if is_my_prefix_v6() then accept;
+            reject;
+        };
+    };
+}
+
+# ============================================
+# BGP Sessions (configured per-provider)
+# ============================================
+
+# Provider sessions will be added in Step 4
+# Example placeholder:
+# protocol bgp vultr_v4 from upstream_v4 {
+#     neighbor 169.254.169.254 as 64515;
+#     password "secret";
+#     multihop 2;
+# }
+```
+
+## Configuration Breakdown
+
+### Variables Section
+
+```bird
+define MY_ASN = 212345;
+define MY_IPv4 = 203.0.113.0/24;
+define MY_IPv6 = 2001:db8:abcd::/48;
+```
+
+Using variables makes it easy to update prefixes without changing multiple locations.
+
+### Static Routes
+
+```bird
+protocol static static_anycast_v4 {
+    ipv4;
+    route MY_IPv4 blackhole;
+}
+```
+
+The `blackhole` route type creates a route that discards traffic. This is necessary because:
+- BIRD needs a route to exist to export it via BGP
+- Traffic to the anycast IP is handled by the local service, not forwarded
+
+<Aside type="tip">
+The blackhole route doesn't affect local traffic. Services bound to the anycast IP will still receive traffic normally.
+</Aside>
+
+### Export Filters
+
+```bird
+export filter {
+    if is_my_prefix_v4() then accept;
+    reject;
+};
+```
+
+This filter ensures only your authorized prefixes are announced. Never announce prefixes you don't own.
+
+## Testing the Configuration
+
+<Steps>
+1. **Check syntax**
+   ```bash
+   sudo birdc configure check
+   ```
+
+2. **Apply configuration**
+   ```bash
+   sudo birdc configure
+   ```
+
+3. **Verify protocols**
+   ```bash
+   sudo birdc show protocols
+   ```
+   
+   Expected output:
+   ```
+   BIRD 2.x ready.
+   Name       Proto      Table      State  Since         Info
+   device1    Device     ---        up     12:00:00
+   direct1    Direct     ---        up     12:00:00
+   kernel_v4  Kernel     master4    up     12:00:00
+   kernel_v6  Kernel     master6    up     12:00:00
+   static_anycast_v4 Static master4 up     12:00:00
+   static_anycast_v6 Static master6 up     12:00:00
+   ```
+
+4. **Check routes**
+   ```bash
+   sudo birdc show route
+   ```
+   
+   You should see your anycast prefixes as blackhole routes.
+</Steps>
+
+## Enabling BIRD Service
+
+```bash
+# Enable BIRD to start on boot
+sudo systemctl enable bird
+
+# Start BIRD
+sudo systemctl start bird
+
+# Check status
+sudo systemctl status bird
+```
+
+## Multiple Nodes
+
+For anycast to work, you'll deploy this same configuration on multiple servers in different locations. Each server will:
+
+- Have the same anycast IPs on loopback
+- Run the same BIRD configuration (with different router IDs)
+- Announce the same prefixes to their local upstream provider
+
+<Aside>
+Remember to change the `router id` on each server. Use each server's unique primary IP address.
+</Aside>
+
+## Next Step
+
+With BIRD configured, you're ready to set up BGP sessions with your upstream provider(s).
+
+<LinkCard
+  title="Step 4: Provider Setup"
+  description="Configure BGP sessions with Vultr, Vultr, or other providers."
+  href="/example/step-4"
+/>
+
+## Related Documentation
+
+<LinkCard
+  title="BIRD 2.x Setup Guide"
+  description="Comprehensive BIRD configuration reference."
+  href="/guides/bird-setup"
+/>
+
+<LinkCard
+  title="BIRD Configuration Reference"
+  description="Detailed syntax and options reference."
+  href="/reference/bird-config"
+/>

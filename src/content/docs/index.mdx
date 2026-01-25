@@ -1,40 +1,51 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: DIY Anycast Networking | Build Resilient Global Services
+description: Learn to build your own anycast network from scratch. Step-by-step guides for hobbyists and startups to deploy globally distributed, resilient services using BGP.
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
-  image:
-    file: ../../assets/houston.webp
+  tagline: Build resilient, globally distributed services with your own anycast network. From acquiring an ASN to announcing your IP prefixes worldwide.
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Get Started
+      link: /getting-started/what-is-anycast/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
-      icon: external
+      variant: primary
+    - text: View Guides
+      link: /guides/bird-setup/
+      icon: open-book
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+## Why Build Your Own Anycast Network?
+
+Anycast routing enables you to serve users from the nearest location automatically, improving latency and providing built-in redundancy. Whether you're running a DNS service, a CDN, or want DDoS-resilient infrastructure, this guide walks you through every step.
+
+{/* TODO: Add a brief compelling paragraph about the benefits of DIY anycast for hobbyists and small organizations */}
+
+## What's In This Guide
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
-	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
-	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
-	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
-	</Card>
+  <Card title="What is Anycast?" icon="information">
+    Understand how anycast routing works, how it differs from unicast, and why it's the backbone of resilient internet services.
+    [Learn the basics →](/getting-started/what-is-anycast/)
+  </Card>
+  <Card title="Getting Resources" icon="document">
+    Navigate the process of acquiring your own ASN and IP address space from Regional Internet Registries.
+    [View requirements →](/getting-started/prerequisites/)
+  </Card>
+  <Card title="Configuration Guides" icon="setting">
+    Step-by-step tutorials for configuring BIRD, FRR, and connecting to upstream providers at internet exchange points.
+    [Start configuring →](/guides/bird-setup/)
+  </Card>
+  <Card title="Reference Documentation" icon="open-book">
+    BGP community guides, troubleshooting tips, and best practices for operating your anycast network.
+    [Browse reference →](/reference/bgp-attributes/)
+  </Card>
 </CardGrid>
+
+## Ready to Get Started?
+
+{/* TODO: Add motivational closing paragraph encouraging readers to start their anycast journey */}
+
+This guide assumes basic networking knowledge but explains BGP concepts as we go. Start with understanding [what anycast is](/getting-started/what-is-anycast/) or jump straight to the [prerequisites](/getting-started/prerequisites/) if you're ready to build.

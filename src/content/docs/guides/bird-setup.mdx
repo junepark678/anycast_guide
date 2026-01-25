@@ -1,0 +1,280 @@
+---
+title: "BIRD 2.x BGP Setup | Anycast Configuration Guide"
+description: "Learn how to install and configure BIRD 2.x for anycast BGP routing. Complete setup guide with examples for announcing prefixes and route filtering."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+Anycast networking relies on BGP to announce your IP prefixes from multiple locations. BIRD is one of the most popular routing daemons for this purpose, known for its powerful filtering language and efficient performance.
+
+{/* TODO: Brief paragraph about why BIRD is a good choice for hobbyists and small deployments */}
+
+## Introduction to BIRD
+
+BIRD (BIRD Internet Routing Daemon) is an open-source routing daemon that supports multiple routing protocols, including BGP, OSPF, and RIP. For anycast deployments, we focus on its BGP capabilities.
+
+{/* TODO: Expand on BIRD 2.x vs 1.x differences, why 2.x is recommended */}
+
+<Aside>
+BIRD 2.x unified IPv4 and IPv6 into a single daemon, replacing the separate `bird` and `bird6` binaries from version 1.x.
+</Aside>
+
+## Installation
+
+<Tabs>
+  <TabItem label="Debian/Ubuntu">
+    ```bash
+    # Install BIRD from official repositories
+    sudo apt update
+    sudo apt install bird2
+
+    # Verify installation
+    bird --version
+    ```
+
+    {/* TODO: Add notes about Debian/Ubuntu version differences and when to use backports */}
+  </TabItem>
+  <TabItem label="RHEL/Rocky">
+    ```bash
+    # Enable EPEL repository if needed
+    sudo dnf install epel-release
+
+    # Install BIRD
+    sudo dnf install bird
+
+    # Verify installation
+    bird --version
+    ```
+
+    {/* TODO: Add notes about RHEL/Rocky specific considerations */}
+  </TabItem>
+  <TabItem label="From Source">
+    ```bash
+    # Install build dependencies
+    sudo apt install build-essential autoconf flex bison libreadline-dev libncurses-dev
+
+    # Download and extract source
+    wget https://bird.network.cz/download/bird-2.15.tar.gz
+    tar xzf bird-2.15.tar.gz
+    cd bird-2.15
+
+    # Configure and build
+    ./configure --prefix=/usr --sysconfdir=/etc/bird
+    make
+    sudo make install
+    ```
+
+    {/* TODO: Add notes about why you might compile from source (newer features, specific patches) */}
+  </TabItem>
+</Tabs>
+
+## Basic Configuration Structure
+
+BIRD's configuration file is typically located at `/etc/bird/bird.conf` or `/etc/bird.conf`. The configuration consists of several key sections.
+
+```conf
+# /etc/bird/bird.conf
+
+# Router ID - must be unique, typically your primary IPv4 address
+router id 192.0.2.1;
+
+# Logging configuration
+log syslog all;
+log "/var/log/bird.log" { debug, trace, info, remote, warning, error, auth, fatal, bug };
+
+# Device protocol - required for interface scanning
+protocol device {
+    scan time 10;
+}
+
+# Direct protocol - learns routes from kernel
+protocol direct {
+    ipv4;
+    ipv6;
+    interface "lo";
+}
+
+# Kernel protocol - syncs routes to/from kernel
+protocol kernel {
+    ipv4 {
+        export all;
+        import none;
+    };
+}
+```
+
+{/* TODO: Explain each section in detail, what it does and why it's needed */}
+
+<Aside type="tip">
+Always test configuration changes with `birdc configure check` before applying them.
+</Aside>
+
+## Configuring BGP Protocol
+
+The BGP protocol section defines your peering sessions with upstream providers.
+
+```conf
+# Define your AS number
+define MY_ASN = 65001;
+define UPSTREAM_ASN = 64512;
+
+# BGP template for common settings
+template bgp upstream {
+    local as MY_ASN;
+    hold time 90;
+    keepalive time 30;
+    graceful restart on;
+    
+    ipv4 {
+        import none;
+        export filter export_filter;
+    };
+}
+
+# Upstream BGP session
+protocol bgp vultr from upstream {
+    neighbor 169.254.169.254 as UPSTREAM_ASN;
+    password "your-bgp-password";
+    multihop 2;
+}
+```
+
+{/* TODO: Explain template usage, session parameters, and authentication */}
+
+## Announcing Your Prefixes
+
+To announce your anycast prefixes, you need to create static routes and export them via BGP.
+
+```conf
+# Define your anycast prefix
+define ANYCAST_PREFIX = 203.0.113.0/24;
+
+# Static protocol for your announced prefixes
+protocol static anycast_routes {
+    ipv4;
+    route ANYCAST_PREFIX blackhole;
+}
+
+# Export filter
+filter export_filter {
+    if net = ANYCAST_PREFIX then accept;
+    reject;
+}
+```
+
+{/* TODO: Explain blackhole routes, why they're used, and prefix validation */}
+
+<Aside type="caution">
+Only announce prefixes you are authorized to announce. Incorrect announcements can disrupt internet routing and may result in your prefixes being filtered by upstream providers.
+</Aside>
+
+## Filtering and Route Policies
+
+BIRD's filtering language is powerful and allows complex route policies.
+
+```conf
+# Function to validate announced prefixes
+function is_my_prefix() {
+    if net = 203.0.113.0/24 then return true;
+    if net = 2001:db8::/32 then return true;
+    return false;
+}
+
+# Export filter with prepending based on conditions
+filter export_filter {
+    if !is_my_prefix() then reject;
+    
+    # Prepend AS path to reduce preference at this location
+    # bgp_path.prepend(MY_ASN);
+    
+    accept;
+}
+
+# Import filter (typically reject all for anycast)
+filter import_filter {
+    reject;
+}
+```
+
+{/* TODO: More filtering examples, communities, local preference manipulation */}
+
+## Testing Your Configuration
+
+<Steps>
+1. **Check configuration syntax**
+   ```bash
+   sudo birdc configure check
+   ```
+
+2. **Apply new configuration**
+   ```bash
+   sudo birdc configure
+   ```
+
+3. **Verify BGP session status**
+   ```bash
+   sudo birdc show protocols all vultr
+   ```
+
+4. **Check announced routes**
+   ```bash
+   sudo birdc show route export vultr
+   ```
+</Steps>
+
+{/* TODO: Expand on what to look for in output, common errors */}
+
+## Common BIRD Commands
+
+Here are essential `birdc` commands for managing your BIRD instance:
+
+```bash
+# Enter BIRD client
+sudo birdc
+
+# Show all protocols and their status
+show protocols
+
+# Show detailed info for a specific protocol
+show protocols all <protocol_name>
+
+# Show routing table
+show route
+
+# Show routes exported to a peer
+show route export <protocol_name>
+
+# Reload configuration
+configure
+
+# Check configuration without applying
+configure check
+
+# Soft reset a BGP session
+restart <protocol_name>
+
+# Show memory usage
+show memory
+```
+
+{/* TODO: Add more commands, explain output interpretation */}
+
+## Next Steps
+
+<LinkCard
+  title="BIRD Configuration Reference"
+  description="Detailed reference for BIRD configuration options and syntax."
+  href="/reference/bird-config"
+/>
+
+<LinkCard
+  title="BGP Health Checks"
+  description="Set up automated health checks and failover for your anycast deployment."
+  href="/guides/health-checks"
+/>
+
+<LinkCard
+  title="Provider Setup Guide"
+  description="Connect BIRD to your upstream BGP provider."
+  href="/guides/provider-setup"
+/>

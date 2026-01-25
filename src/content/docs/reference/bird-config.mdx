@@ -1,0 +1,491 @@
+---
+title: "BIRD Configuration Reference | Syntax & Options"
+description: "Complete BIRD routing daemon configuration reference. Syntax guide for BGP, filters, protocols, and route attributes for anycast deployments."
+---
+
+import { Aside, Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+BIRD (BIRD Internet Routing Daemon) is a powerful routing daemon commonly used for anycast deployments. This reference covers BIRD 2.x configuration syntax and options.
+
+{/* TODO: Add note about BIRD 1.x vs 2.x differences */}
+
+## Configuration File Structure
+
+BIRD configuration files use a C-like syntax with blocks, statements, and expressions.
+
+```bird
+# Comments start with hash
+/* Block comments also work */
+
+# Main configuration file: /etc/bird/bird.conf
+
+# Include additional configuration files
+include "/etc/bird/filters.conf";
+include "/etc/bird/peers/*.conf";
+```
+
+{/* TODO: Explain file organization best practices */}
+{/* TODO: Cover configuration reload vs restart */}
+
+<Aside type="tip">
+Use `birdc configure` to reload configuration without restarting. Use `birdc configure check` to validate syntax before applying.
+</Aside>
+
+## Global Options
+
+Global options are set at the top level of the configuration file.
+
+```bird
+# Router ID (required) - typically your primary IPv4 address
+router id 192.0.2.1;
+
+# Logging configuration
+log syslog all;
+log "/var/log/bird.log" { debug, trace, info, remote, warning, error, auth, fatal, bug };
+
+# Debugging options
+debug protocols all;
+
+# Graceful restart configuration
+graceful restart wait 15;
+
+# RPKI cache timeout
+timeformat protocol iso long;
+```
+
+{/* TODO: Document all global options */}
+{/* TODO: Explain logging levels and destinations */}
+
+### Time Formats
+
+```bird
+timeformat base iso long;
+timeformat log iso long;
+timeformat protocol iso long;
+timeformat route iso long;
+```
+
+{/* TODO: Explain timeformat options */}
+
+## Protocol Section
+
+Protocols define how BIRD learns and distributes routes.
+
+### BGP Protocol Options
+
+```bird
+protocol bgp upstream1 {
+    description "Primary upstream provider";
+    
+    # Basic settings
+    local 192.0.2.1 as 65001;
+    neighbor 192.0.2.254 as 64512;
+    
+    # Session parameters
+    hold time 90;
+    keepalive time 30;
+    connect retry time 30;
+    connect delay time 5;
+    error wait time 60, 300;
+    
+    # Capabilities
+    advertise ipv4 multicast off;
+    capabilities yes;
+    
+    # Route handling
+    ipv4 {
+        import filter import_upstream;
+        export filter export_upstream;
+        next hop self;
+    };
+    
+    ipv6 {
+        import filter import_upstream_v6;
+        export filter export_upstream_v6;
+        next hop self;
+    };
+    
+    # MD5 authentication
+    password "secret";
+    
+    # Multihop (if neighbor isn't directly connected)
+    multihop 2;
+    
+    # Graceful restart
+    graceful restart yes;
+}
+```
+
+{/* TODO: Document all BGP protocol options */}
+{/* TODO: Add iBGP vs eBGP configuration differences */}
+{/* TODO: Cover BFD integration */}
+
+<Aside>
+For anycast, you typically configure eBGP sessions with your upstream provider. Each anycast node peers with its local provider independently.
+</Aside>
+
+#### Common BGP Options Reference
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `local as` | Local autonomous system number | Required |
+| `neighbor as` | Neighbor's autonomous system number | Required |
+| `hold time` | BGP hold timer in seconds | 240 |
+| `keepalive time` | Keepalive interval | hold time / 3 |
+| `multihop` | Allow non-directly-connected peers | 1 (disabled) |
+| `passive` | Wait for incoming connections | no |
+| `next hop self` | Rewrite next hop to local address | no |
+
+{/* TODO: Complete this table with all options */}
+
+### Static Protocol
+
+Define static routes to be distributed via BGP.
+
+```bird
+protocol static anycast_routes {
+    ipv4;
+    
+    # Anycast prefix - advertise when healthy
+    route 203.0.113.0/24 blackhole;
+    
+    # Or with specific next hop
+    route 203.0.113.0/24 via 192.0.2.1;
+    
+    # Reject route (for filtering)
+    route 10.0.0.0/8 reject;
+}
+
+protocol static anycast_routes_v6 {
+    ipv6;
+    route 2001:db8::/48 blackhole;
+}
+```
+
+{/* TODO: Explain blackhole vs via vs reject */}
+{/* TODO: Cover dynamic static routes with BFD */}
+
+### Direct Protocol
+
+Automatically imports routes for directly connected networks.
+
+```bird
+protocol direct {
+    ipv4;
+    ipv6;
+    interface "eth0", "lo";
+}
+```
+
+{/* TODO: Explain when direct protocol is needed */}
+
+### Kernel Protocol
+
+Controls route exchange with the kernel routing table.
+
+```bird
+protocol kernel {
+    ipv4 {
+        export all;      # Export routes to kernel
+        import none;     # Don't import kernel routes
+    };
+    learn;               # Learn routes added externally
+    scan time 20;        # Scan kernel table every 20s
+    merge paths yes;     # Enable ECMP
+}
+
+protocol kernel {
+    ipv6 {
+        export all;
+        import none;
+    };
+}
+```
+
+{/* TODO: Document kernel protocol options */}
+{/* TODO: Explain kernel table selection */}
+
+## Filter Syntax
+
+Filters control which routes are imported, exported, or modified.
+
+```bird
+# Basic filter structure
+filter filter_name {
+    # Filter body - statements executed for each route
+    
+    if net = 203.0.113.0/24 then accept;
+    if bgp_path ~ [= 64512 * =] then reject;
+    
+    accept;  # Default action
+}
+
+# Inline filter (for simple cases)
+protocol bgp example {
+    ipv4 {
+        import where net != 0.0.0.0/0;
+        export where source = RTS_STATIC;
+    };
+}
+```
+
+{/* TODO: Explain filter evaluation order */}
+{/* TODO: Cover all filter statements (if, case, return, etc.) */}
+
+### Filter Expressions
+
+```bird
+filter import_upstream {
+    # Reject default route
+    if net = 0.0.0.0/0 then reject;
+    
+    # Reject private address space
+    if net ~ [10.0.0.0/8+, 172.16.0.0/12+, 192.168.0.0/16+] then reject;
+    
+    # Set local preference based on community
+    if (64512, 100) ~ bgp_community then bgp_local_pref = 150;
+    
+    # Accept everything else
+    accept;
+}
+
+filter export_upstream {
+    # Only export our anycast prefix
+    if net = 203.0.113.0/24 then {
+        # Add communities
+        bgp_community.add((65001, 1));
+        accept;
+    }
+    
+    reject;
+}
+```
+
+### Prefix Sets and Matching
+
+```bird
+# Define prefix sets
+define my_prefixes = [203.0.113.0/24, 198.51.100.0/24];
+define bogons = [0.0.0.0/8+, 10.0.0.0/8+, 127.0.0.0/8+, 
+                 169.254.0.0/16+, 172.16.0.0/12+, 192.168.0.0/16+];
+
+filter example {
+    # Exact match
+    if net = 203.0.113.0/24 then accept;
+    
+    # Set membership
+    if net ~ my_prefixes then accept;
+    
+    # Prefix length range: /24 to /28 within 203.0.113.0/24
+    if net ~ [203.0.113.0/24{24,28}] then accept;
+}
+```
+
+{/* TODO: Add more prefix matching examples */}
+{/* TODO: Cover AS path matching expressions */}
+
+## Functions
+
+Reusable code blocks for complex filter logic.
+
+```bird
+# Function definition
+function is_own_prefix() {
+    if net ~ [203.0.113.0/24, 2001:db8::/48] then return true;
+    return false;
+}
+
+function set_anycast_communities() {
+    # Add location identifier
+    bgp_community.add((65001, 1001));  # Location: US-East
+    
+    # Add blackhole community if needed
+    if dest = RTD_BLACKHOLE then {
+        bgp_community.add((64512, 666));
+    }
+}
+
+# Use in filter
+filter export_filter {
+    if !is_own_prefix() then reject;
+    set_anycast_communities();
+    accept;
+}
+```
+
+{/* TODO: Document function syntax and limitations */}
+{/* TODO: Add more utility function examples */}
+
+## Route Attributes
+
+BIRD provides access to various route attributes within filters.
+
+```bird
+filter example {
+    # BGP attributes
+    print "AS Path: ", bgp_path;
+    print "Next hop: ", bgp_next_hop;
+    print "Local pref: ", bgp_local_pref;
+    print "MED: ", bgp_med;
+    print "Origin: ", bgp_origin;
+    print "Communities: ", bgp_community;
+    
+    # Modify attributes
+    bgp_local_pref = 200;
+    bgp_med = 100;
+    bgp_path.prepend(65001);
+    bgp_community.add((65001, 100));
+    bgp_community.delete([(64512, *)]);
+    
+    # Generic route attributes
+    print "Source: ", source;
+    print "Dest type: ", dest;
+    print "Network: ", net;
+    
+    accept;
+}
+```
+
+{/* TODO: Create comprehensive attribute reference table */}
+{/* TODO: Document attribute modification operations */}
+
+### Common Attributes Reference
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `net` | prefix | Network prefix |
+| `source` | enum | Route source (RTS_BGP, RTS_STATIC, etc.) |
+| `dest` | enum | Route destination type |
+| `bgp_path` | AS path | BGP AS_PATH attribute |
+| `bgp_local_pref` | int | LOCAL_PREF value |
+| `bgp_med` | int | MED value |
+| `bgp_origin` | enum | ORIGIN attribute |
+| `bgp_community` | clist | Standard communities |
+| `bgp_large_community` | lclist | Large communities |
+
+{/* TODO: Complete this table */}
+
+## Common Configuration Patterns
+
+### Anycast Health Check Integration
+
+```bird
+# Dynamic route based on health check
+protocol static anycast {
+    ipv4;
+    # Route controlled by health check script
+    route 203.0.113.0/24 blackhole;
+}
+
+# Health check script modifies this via birdc:
+# birdc enable anycast
+# birdc disable anycast
+```
+
+{/* TODO: Expand on health check integration patterns */}
+{/* TODO: Add BFD-based health checking */}
+
+### AS Path Prepending
+
+```bird
+filter export_prepend {
+    if net = 203.0.113.0/24 then {
+        # Prepend 3 times to make this path less preferred
+        bgp_path.prepend(65001);
+        bgp_path.prepend(65001);
+        bgp_path.prepend(65001);
+        accept;
+    }
+    reject;
+}
+```
+
+### Community-Based Actions
+
+```bird
+filter import_with_communities {
+    # Adjust local pref based on incoming communities
+    if (64512, 150) ~ bgp_community then bgp_local_pref = 150;
+    if (64512, 50) ~ bgp_community then bgp_local_pref = 50;
+    
+    accept;
+}
+```
+
+## Example Configurations
+
+### Basic Anycast Node
+
+```bird
+# /etc/bird/bird.conf - Basic anycast configuration
+
+router id 192.0.2.1;
+log syslog all;
+
+# Device protocol - required
+protocol device {
+    scan time 10;
+}
+
+# Kernel protocol
+protocol kernel {
+    ipv4 {
+        export all;
+        import none;
+    };
+}
+
+# Our anycast prefix
+protocol static anycast {
+    ipv4;
+    route 203.0.113.0/24 blackhole;
+}
+
+# Upstream BGP session
+protocol bgp vultr {
+    local as 65001;
+    neighbor 169.254.169.254 as 64515;
+    multihop 2;
+    password "bgp-password";
+    
+    ipv4 {
+        import none;
+        export where net = 203.0.113.0/24;
+    };
+}
+```
+
+{/* TODO: Add more complete example configurations */}
+{/* TODO: Add IPv6 configuration example */}
+{/* TODO: Add multi-upstream configuration example */}
+
+<Aside type="tip">
+Always test configuration changes with `birdc configure check` before applying them in production.
+</Aside>
+
+## Related Resources
+
+<CardGrid>
+  <LinkCard
+    title="BIRD Setup Guide"
+    href="/guides/bird-setup/"
+    description="Step-by-step BIRD installation and setup"
+  />
+  <LinkCard
+    title="BGP Attributes Reference"
+    href="/reference/bgp-attributes/"
+    description="Understanding BGP path attributes"
+  />
+  <LinkCard
+    title="Troubleshooting Guide"
+    href="/reference/troubleshooting/"
+    description="Debug BIRD configuration issues"
+  />
+</CardGrid>
+
+## External Resources
+
+{/* TODO: Add links to official BIRD documentation */}
+
+- [BIRD 2.0 User's Guide](https://bird.network.cz/?get_doc&v=20&f=bird.html)
+- [BIRD GitLab Repository](https://gitlab.nic.cz/labs/bird)

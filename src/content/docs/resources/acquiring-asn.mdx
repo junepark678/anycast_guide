@@ -1,0 +1,105 @@
+---
+title: "Acquiring an ASN"
+description: "Complete guide to obtaining an Autonomous System Number (ASN) for BGP routing. Learn about RIR applications, LIR sponsorship, and justification requirements."
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+An Autonomous System Number (ASN) is your unique identifier on the internet's routing system. This guide covers everything you need to know about obtaining one for your anycast project.
+
+## What is an ASN?
+
+An ASN identifies your network as a distinct routing entity on the internet, allowing you to announce IP prefixes via BGP.
+
+{/* TODO: Explain ASNs in the context of BGP routing */}
+{/* TODO: Discuss how ASNs appear in AS paths */}
+{/* TODO: Mention that ASNs are required for multihoming and anycast */}
+
+### How ASNs Are Used
+
+{/* TODO: Peering relationships */}
+{/* TODO: Route origination */}
+{/* TODO: Traffic engineering */}
+
+<Aside>
+For anycast networking, you'll need your own ASN. There's no practical workaround since you need to originate the same prefix from multiple locations under your control.
+</Aside>
+
+## RIR Application Process
+
+You can apply for an ASN directly through a Regional Internet Registry if you're a member. However, this process is out of scope for this guide due to high costs and complexity.
+
+## LIR Sponsorship Option
+
+For most hobbyists and small organizations, LIR sponsorship is the practical path to obtaining an ASN.
+
+<Aside type="tip">
+LIR sponsors are generally very familiar with the ASN application process and can help you navigate justification requirements. They often have streamlined procedures to make it easier for you to get your ASN without dealing directly with the RIR and provide expert guidance. Generally, LIR markups are not very high compared to actual RIR fees due.
+</Aside>
+
+### How Sponsorship Works
+
+Acquiring an ASN through an LIR sponsor involves the sponsor submitting the application on your behalf to the relevant RIR. The LIR is responsible for corresponding on your behalf with the RIR. You generally maintain control of the ASN once it is assigned.
+
+### Finding a Sponsor
+Some popular LIR sponsors include:
+- Lagrange Cloud (https://lagrange.cloud/)
+- iFog (https://ifog.ch/)
+
+### Typical Process
+1. **Choose a Sponsor**: Research and select an LIR sponsor that fits your needs.
+2. **Submit Application**: Provide the sponsor with necessary information and justification for the ASN. Most sponsors have a streamlined process for managing applications, which vary between providers. Contact your chosen sponsor for specific instructions.
+3. **Pay Fees**: Pay any applicable fees to the sponsor for the ASN application and maintenance.
+4. **Receive ASN**: Once approved, the sponsor will inform you of your assigned ASN.
+
+## Justification Requirements
+
+RIRs require you to demonstrate a legitimate need for an ASN.
+
+### What RIRs Want to See
+
+Justifying your need for an ASN generally requires proof of presence in-region and intent to multihome. The threshold for justification varies by RIR. Below are some (potentially outdated) examples for RIPE NCC and ARIN.
+
+#### RIPE NCC
+
+Generally, the RIPE NCC accepts justification via invoices for products or services that require an ASN, such as:
+- BGP-capable VM instances
+- Dedicated IP transit services
+- Colocation services with BGP support
+
+Make sure that the invoices clearly show your name or organization and the service details.
+
+#### ARIN
+
+Generally, ARIN does not consider a BGP-capable VM alone sufficient justification. However, they may accept:
+- Colocation services with BGP support
+- Dedicated server hosting with BGP capabilities
+
+
+<Aside type="caution">
+These examples are non-exhaustive and are subject to change. RIRs generally reserve the right to case-by-case discretion. Always check the latest RIR documentation or consult your sponsor for up-to-date guidance.
+</Aside>
+
+### Ongoing Obligations
+
+Once you have an ASN, make sure to comply with relevant policy guidelines set by your RIR, generally including:
+- Accurate contact information
+- Proper use of the ASN for routing
+- Payment of any applicable fees
+- Adherence to all relevant RIR policies
+
+## Next Steps
+
+With an ASN in hand, you'll need to register your routes and set up RPKI.
+
+<LinkCard
+  title="IRR & RPKI Setup"
+  description="Register your routes in IRR databases and create ROA records for RPKI."
+  href="/resources/irr-rpki/"
+/>
+
+<LinkCard
+  title="Acquiring IP Space"
+  description="Get IP addresses to announce from your new ASN."
+  href="/resources/acquiring-ip-space/"
+/>

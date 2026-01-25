@@ -1,0 +1,326 @@
+---
+title: "BGP Provider Setup | Connecting to Upstream Providers"
+description: "Set up BGP sessions with hosting providers for anycast. Includes step-by-step guides for Vultr, BuyVM, and Path.net with configuration examples."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+Before you can announce your anycast prefixes to the internet, you need to establish BGP sessions with upstream providers. This guide covers the general process and provides specific instructions for popular hobbyist-friendly providers.
+
+{/* TODO: Intro paragraph about what to expect from the provider setup process */}
+
+## Choosing a BGP-Capable Provider
+
+Not all hosting providers offer BGP support, and those that do vary significantly in their requirements and ease of setup.
+
+{/* TODO: Criteria for choosing a provider - cost, locations, BGP support level, IP requirements */}
+
+<Aside>
+Most providers require you to bring your own IP space (at minimum a /24 for IPv4 or /48 for IPv6). Some providers offer IP space you can announce, but this is less common.
+</Aside>
+
+Key factors to consider:
+
+- **BGP support tier**: Full table, default route only, or customer prefixes only
+- **Location availability**: Where you can deploy anycast nodes
+- **Setup complexity**: Portal-based vs. manual/ticket-based
+- **Cost**: Monthly fees, BGP session fees, IP transit costs
+- **Community support**: Documentation quality and user community
+
+{/* TODO: Expand on each factor with specific examples */}
+
+## General Setup Process
+
+Regardless of provider, the BGP setup process typically follows these steps:
+
+<Steps>
+1. **Verify your IP resources**
+   
+   Ensure you have:
+   - IP prefix(es) registered in an IRR database
+   - Valid ROA records in RPKI
+   - LOA (Letter of Authorization) ready if required
+
+2. **Request BGP session from provider**
+   
+   Provide:
+   - Your ASN
+   - Prefixes you'll announce
+   - LOA if required
+
+3. **Configure your routing daemon**
+   
+   Set up BIRD or FRR with:
+   - Provider's neighbor IP and ASN
+   - BGP password (if provided)
+   - Appropriate filters
+
+4. **Establish BGP session**
+   
+   Start your routing daemon and verify the session comes up.
+
+5. **Verify prefix announcement**
+   
+   Check looking glasses to confirm your prefixes are visible.
+</Steps>
+
+{/* TODO: More detail on each step, common pitfalls */}
+
+## Provider Examples
+
+### Vultr BGP Setup
+
+Vultr offers BGP on their "Bare Metal" and "Cloud Compute" instances across all locations. BGP setup is done through their web portal.
+
+<Aside type="tip">
+Vultr provides an easy-to-use BGP portal and doesn't require a ticket for setup. This makes them popular for hobbyist anycast projects.
+</Aside>
+
+<Steps>
+1. **Enable BGP on your account**
+   
+   Navigate to Account → BGP in the Vultr portal and request BGP enablement.
+
+2. **Add your IP prefix**
+   
+   Submit your prefix details including LOA and IRR information.
+
+3. **Configure BGP instance**
+   
+   Create a BGP-enabled instance or enable BGP on existing instance.
+
+4. **Configure your routing daemon**
+</Steps>
+
+<Tabs>
+  <TabItem label="BIRD">
+    ```conf
+    # Vultr BGP configuration for BIRD
+    protocol bgp vultr {
+        local as YOUR_ASN;
+        neighbor 169.254.169.254 as 64515;
+        multihop 2;
+        password "your-vultr-bgp-password";
+        
+        ipv4 {
+            import none;
+            export filter {
+                if net = YOUR_PREFIX then accept;
+                reject;
+            };
+        };
+    }
+    ```
+  </TabItem>
+  <TabItem label="FRR">
+    ```conf
+    router bgp YOUR_ASN
+     neighbor 169.254.169.254 remote-as 64515
+     neighbor 169.254.169.254 ebgp-multihop 2
+     neighbor 169.254.169.254 password your-vultr-bgp-password
+     
+     address-family ipv4 unicast
+      network YOUR_PREFIX
+      neighbor 169.254.169.254 activate
+      neighbor 169.254.169.254 route-map VULTR-EXPORT out
+     exit-address-family
+    !
+    ```
+  </TabItem>
+</Tabs>
+
+{/* TODO: Vultr-specific details, quirks, pricing notes */}
+
+### BuyVM BGP Setup
+
+BuyVM (Frantech) offers BGP at their Las Vegas, New York, and Luxembourg locations. Setup requires a support ticket.
+
+<Aside>
+BuyVM is known for competitive pricing and good network connectivity. BGP sessions are available on KVM slices and dedicated servers.
+</Aside>
+
+<Steps>
+1. **Submit a support ticket**
+   
+   Request BGP enablement with your ASN and prefixes.
+
+2. **Receive BGP credentials**
+   
+   BuyVM will provide neighbor IP, ASN, and password.
+
+3. **Configure loopback interface**
+   
+   Add your anycast IP to the loopback interface.
+
+4. **Configure routing daemon**
+</Steps>
+
+<Tabs>
+  <TabItem label="BIRD">
+    ```conf
+    # BuyVM BGP configuration for BIRD
+    protocol bgp buyvm {
+        local as YOUR_ASN;
+        neighbor BUYVM_NEIGHBOR_IP as 53667;
+        password "your-buyvm-password";
+        
+        ipv4 {
+            import none;
+            export filter {
+                if net = YOUR_PREFIX then accept;
+                reject;
+            };
+        };
+    }
+    ```
+  </TabItem>
+  <TabItem label="FRR">
+    ```conf
+    router bgp YOUR_ASN
+     neighbor BUYVM_NEIGHBOR_IP remote-as 53667
+     neighbor BUYVM_NEIGHBOR_IP password your-buyvm-password
+     
+     address-family ipv4 unicast
+      network YOUR_PREFIX
+      neighbor BUYVM_NEIGHBOR_IP activate
+     exit-address-family
+    !
+    ```
+  </TabItem>
+</Tabs>
+
+{/* TODO: BuyVM-specific details, quirks, location info */}
+
+### Path.net BGP Setup
+
+Path.net specializes in DDoS-protected hosting with BGP support. They offer both VPS and dedicated server options.
+
+<Aside type="tip">
+Path.net's DDoS protection can be valuable for anycast deployments serving public-facing services.
+</Aside>
+
+<Steps>
+1. **Contact sales or support**
+   
+   Request BGP service with your requirements.
+
+2. **Provide IP documentation**
+   
+   Submit LOA and verify IRR/RPKI records.
+
+3. **Receive session details**
+   
+   Path.net will provide configuration parameters.
+
+4. **Configure routing daemon**
+</Steps>
+
+<Tabs>
+  <TabItem label="BIRD">
+    ```conf
+    # Path.net BGP configuration for BIRD
+    protocol bgp pathnet {
+        local as YOUR_ASN;
+        neighbor PATHNET_NEIGHBOR_IP as PATHNET_ASN;
+        password "your-pathnet-password";
+        
+        ipv4 {
+            import none;
+            export filter {
+                if net = YOUR_PREFIX then accept;
+                reject;
+            };
+        };
+    }
+    ```
+  </TabItem>
+  <TabItem label="FRR">
+    ```conf
+    router bgp YOUR_ASN
+     neighbor PATHNET_NEIGHBOR_IP remote-as PATHNET_ASN
+     neighbor PATHNET_NEIGHBOR_IP password your-pathnet-password
+     
+     address-family ipv4 unicast
+      network YOUR_PREFIX
+      neighbor PATHNET_NEIGHBOR_IP activate
+     exit-address-family
+    !
+    ```
+  </TabItem>
+</Tabs>
+
+{/* TODO: Path.net-specific details, DDoS protection notes */}
+
+## Verifying Your BGP Session
+
+After configuring your routing daemon, verify the session is established:
+
+```bash
+# BIRD
+birdc show protocols all <session_name>
+
+# FRR
+vtysh -c "show bgp summary"
+vtysh -c "show bgp neighbors <neighbor_ip>"
+```
+
+Check external looking glasses to verify your prefixes are visible:
+
+{/* TODO: List of looking glass tools and how to use them */}
+
+- **Hurricane Electric BGP Toolkit**: bgp.he.net
+- **RIPE RIS Looking Glass**: ris.ripe.net
+- **RouteViews**: routeviews.org
+
+## Troubleshooting Provider Connections
+
+Common issues when establishing BGP sessions:
+
+### Session Stuck in "Connect" or "Active" State
+
+{/* TODO: Detailed troubleshooting steps */}
+
+- Verify neighbor IP and ASN
+- Check firewall rules (TCP port 179)
+- Confirm multihop settings if required
+- Verify BGP password
+
+### Session Established but No Routes Advertised
+
+{/* TODO: Detailed troubleshooting steps */}
+
+- Check export filters
+- Verify static routes exist
+- Confirm prefix-list matches your prefix
+
+### Prefixes Not Visible Externally
+
+{/* TODO: Detailed troubleshooting steps */}
+
+- Check IRR registration
+- Verify RPKI/ROA status
+- Contact provider to check their filters
+
+<Aside type="caution">
+Providers may filter your announcements if your IRR or RPKI records are incorrect or missing. Always verify your routing registry entries before troubleshooting BGP issues.
+</Aside>
+
+## Next Steps
+
+<LinkCard
+  title="BGP Health Checks"
+  description="Set up automated health checks and failover for your anycast nodes."
+  href="/guides/health-checks"
+/>
+
+<LinkCard
+  title="BIRD Setup Guide"
+  description="Complete BIRD 2.x configuration guide for anycast."
+  href="/guides/bird-setup"
+/>
+
+<LinkCard
+  title="FRRouting Setup Guide"
+  description="Complete FRR configuration guide for anycast."
+  href="/guides/frr-setup"
+/>

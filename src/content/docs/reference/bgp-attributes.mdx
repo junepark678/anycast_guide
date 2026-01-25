@@ -1,0 +1,209 @@
+---
+title: "BGP Path Attributes | Complete Reference Guide"
+description: "Complete reference for BGP path attributes used in anycast networking. Learn about AS_PATH, LOCAL_PREF, MED, communities, and how they affect route selection."
+---
+
+import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+BGP path attributes control how routes are advertised, received, and selected. Understanding these attributes is essential for properly configuring anycast routing and influencing traffic flow.
+
+{/* TODO: Add brief intro about why attributes matter for anycast specifically */}
+
+## Well-Known Mandatory Attributes
+
+These attributes must be present in every BGP UPDATE message and must be recognized by all BGP implementations.
+
+### ORIGIN
+
+The ORIGIN attribute indicates how the route was introduced into BGP.
+
+{/* TODO: Explain the three origin types and their preference order */}
+
+| Value | Code | Description |
+|-------|------|-------------|
+| IGP | 0 | Route originated from an interior gateway protocol |
+| EGP | 1 | Route originated from EGP (historic) |
+| INCOMPLETE | 2 | Route origin is unknown or learned by other means |
+
+{/* TODO: Add example of when each origin type is used in anycast */}
+
+### AS_PATH
+
+The AS_PATH attribute lists the autonomous systems a route has traversed. This is fundamental to BGP loop prevention and path selection.
+
+{/* TODO: Explain AS_PATH segments (AS_SET vs AS_SEQUENCE) */}
+{/* TODO: Discuss AS_PATH prepending for anycast traffic engineering */}
+{/* TODO: Add table of AS_PATH manipulation techniques */}
+
+<Aside type="tip">
+AS_PATH prepending is a common technique to make certain anycast nodes less preferred. Add your own ASN multiple times to artificially lengthen the path.
+</Aside>
+
+### NEXT_HOP
+
+The NEXT_HOP attribute specifies the IP address to use as the next hop to reach the destinations listed in the UPDATE message.
+
+{/* TODO: Explain next-hop-self and when it's needed */}
+{/* TODO: Cover IPv4 vs IPv6 next hop handling */}
+
+## Well-Known Discretionary Attributes
+
+These attributes must be recognized by all implementations but are not required in every UPDATE message.
+
+### LOCAL_PREF
+
+LOCAL_PREF (Local Preference) is used within an AS to prefer certain exit points. Higher values are preferred.
+
+{/* TODO: Explain LOCAL_PREF usage in anycast scenarios */}
+{/* TODO: Add common LOCAL_PREF value conventions */}
+
+| Value Range | Typical Use |
+|-------------|-------------|
+| 100 | Default/normal routes |
+| 150+ | Preferred routes |
+| 50-99 | Backup routes |
+
+<Aside>
+LOCAL_PREF is only exchanged between iBGP peers. It is not sent to external BGP neighbors.
+</Aside>
+
+### ATOMIC_AGGREGATE
+
+Indicates that the route has been aggregated and some path information has been lost.
+
+{/* TODO: Explain when this attribute is set and its implications */}
+
+## Optional Transitive Attributes
+
+These attributes may or may not be present. If unrecognized, they must still be passed along to other BGP peers.
+
+### AGGREGATOR
+
+Identifies the AS and router that performed route aggregation.
+
+{/* TODO: Add details about AGGREGATOR format and usage */}
+
+### COMMUNITY
+
+BGP communities are 32-bit tags attached to routes that enable flexible routing policies.
+
+{/* TODO: Explain standard community format (ASN:value) */}
+{/* TODO: Cover well-known communities */}
+
+| Community | Value | Description |
+|-----------|-------|-------------|
+| NO_EXPORT | 0xFFFFFF01 | Do not advertise outside the AS |
+| NO_ADVERTISE | 0xFFFFFF02 | Do not advertise to any peer |
+| NO_EXPORT_SUBCONFED | 0xFFFFFF03 | Do not advertise outside the confederation |
+
+### EXTENDED COMMUNITY
+
+Extended communities provide a larger 64-bit tag space and typed structure.
+
+{/* TODO: Explain extended community types (route target, route origin, etc.) */}
+{/* TODO: Cover usage with VPNs and traffic engineering */}
+
+## Optional Non-Transitive Attributes
+
+These attributes may be ignored and are not passed along if unrecognized.
+
+### MED (Multi-Exit Discriminator)
+
+MED suggests to external peers which entry point to prefer when multiple paths exist. Lower values are preferred.
+
+{/* TODO: Explain MED usage between ISPs */}
+{/* TODO: Discuss MED limitations and comparison rules */}
+{/* TODO: Add anycast-specific MED strategies */}
+
+<Aside type="caution">
+MED comparison only occurs between routes from the same neighboring AS by default. This can lead to unexpected behavior in multi-homed anycast setups.
+</Aside>
+
+### ORIGINATOR_ID
+
+Used by route reflectors to prevent routing loops. Contains the router ID of the route's originator.
+
+{/* TODO: Explain route reflector context */}
+
+### CLUSTER_LIST
+
+Lists the route reflector cluster IDs the route has passed through.
+
+{/* TODO: Explain cluster list loop prevention */}
+
+## BGP Communities for Anycast
+
+Communities are particularly useful for anycast deployments to control route propagation and influence path selection.
+
+{/* TODO: Explain how communities help manage anycast traffic */}
+{/* TODO: Add table of common ISP action communities */}
+{/* TODO: Cover blackhole communities (RFC 7999) */}
+
+### Common Community Uses
+
+- **Blackhole routing**: Signal upstream to drop traffic (DDoS mitigation)
+- **Regional scoping**: Limit route advertisement to specific regions
+- **Prepending requests**: Ask upstream to prepend when advertising to their peers
+- **Route tagging**: Mark routes by origin location or type
+
+{/* TODO: Add provider-specific community examples (Vultr, etc.) */}
+
+### Informational Communities
+
+Many networks use large communities (RFC 8092) to provide additional routing metadata.
+
+{/* TODO: Explain large community format and benefits */}
+
+## Path Selection Algorithm
+
+BGP uses a deterministic algorithm to select the best path when multiple routes exist for a destination.
+
+{/* TODO: Add complete path selection order with explanations */}
+
+| Step | Attribute | Preference |
+|------|-----------|------------|
+| 1 | Weight (Cisco) / Local preference | Highest |
+| 2 | LOCAL_PREF | Highest |
+| 3 | Locally originated | Prefer local |
+| 4 | AS_PATH length | Shortest |
+| 5 | ORIGIN | IGP < EGP < INCOMPLETE |
+| 6 | MED | Lowest |
+| 7 | eBGP vs iBGP | Prefer eBGP |
+| 8 | IGP metric to next hop | Lowest |
+| 9 | Router ID | Lowest |
+
+<Aside type="tip">
+For anycast, you typically influence path selection using AS_PATH prepending (step 4) or communities that trigger upstream LOCAL_PREF changes (step 2).
+</Aside>
+
+{/* TODO: Add flowchart or diagram of path selection process */}
+
+## Related Resources
+
+<CardGrid>
+  <LinkCard
+    title="BIRD Configuration Reference"
+    href="/reference/bird-config/"
+    description="Learn how to configure BGP attributes in BIRD"
+  />
+  <LinkCard
+    title="FRRouting Configuration Reference"
+    href="/reference/frr-config/"
+    description="Configure BGP attributes using FRR"
+  />
+  <LinkCard
+    title="Troubleshooting Guide"
+    href="/reference/troubleshooting/"
+    description="Debug BGP attribute-related issues"
+  />
+</CardGrid>
+
+## Further Reading
+
+{/* TODO: Add links to relevant RFCs */}
+{/* TODO: Add links to external BGP attribute resources */}
+
+- RFC 4271 - A Border Gateway Protocol 4 (BGP-4)
+- RFC 1997 - BGP Communities Attribute
+- RFC 8092 - BGP Large Communities
+- RFC 7999 - BLACKHOLE Community

@@ -1,0 +1,519 @@
+---
+title: "FRRouting Configuration Reference | Commands & Syntax"
+description: "Complete FRRouting (FRR) configuration reference for anycast BGP. Commands for router configuration, route maps, prefix lists, and communities."
+---
+
+import { Aside, Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+FRRouting (FRR) is a free, open-source routing suite that provides BGP, OSPF, and other routing protocols. This reference covers FRR configuration for anycast deployments.
+
+{/* TODO: Add brief history/background on FRR */}
+
+## Configuration Modes
+
+FRR uses a hierarchical configuration mode system similar to Cisco IOS.
+
+```
+Router# (privileged EXEC mode)
+Router# configure terminal
+Router(config)# (global configuration mode)
+Router(config)# router bgp 65001
+Router(config-router)# (router configuration mode)
+```
+
+{/* TODO: Explain all configuration modes */}
+{/* TODO: Add mode transition diagram */}
+
+### Mode Hierarchy
+
+| Mode | Prompt | Purpose |
+|------|--------|---------|
+| User EXEC | `>` | Basic monitoring |
+| Privileged EXEC | `#` | Full monitoring and debug |
+| Global Config | `(config)#` | System-wide settings |
+| Router Config | `(config-router)#` | Protocol configuration |
+| Address Family | `(config-router-af)#` | Per-AF settings |
+
+## vtysh Basics
+
+vtysh is the integrated shell for interacting with FRR daemons.
+
+```bash
+# Enter vtysh
+sudo vtysh
+
+# Run single command without entering shell
+sudo vtysh -c "show bgp summary"
+
+# Write configuration to file
+Router# write memory
+# or
+Router# copy running-config startup-config
+```
+
+{/* TODO: Explain vtysh configuration and integration */}
+{/* TODO: Cover vtysh.conf settings */}
+
+<Aside>
+Configuration is stored in `/etc/frr/frr.conf` by default. Use `write memory` to persist changes.
+</Aside>
+
+### Common Show Commands
+
+```bash
+# BGP status
+show bgp summary
+show bgp ipv4 unicast
+show bgp ipv6 unicast
+show bgp neighbors
+show bgp neighbors 192.0.2.1 advertised-routes
+show bgp neighbors 192.0.2.1 received-routes
+
+# Route information
+show ip route
+show ipv6 route
+show ip bgp 203.0.113.0/24
+
+# Running configuration
+show running-config
+show running-config router bgp
+```
+
+{/* TODO: Add more show commands with explanations */}
+
+## BGP Configuration Commands
+
+### Router BGP Section
+
+```bash
+# Enter BGP configuration
+configure terminal
+router bgp 65001
+
+# Router ID (recommended)
+bgp router-id 192.0.2.1
+
+# Logging
+bgp log-neighbor-changes
+
+# Timers (keepalive, holdtime)
+timers bgp 30 90
+
+# Graceful restart
+bgp graceful-restart
+bgp graceful-restart preserve-fw-state
+
+# Disable EBGP connected check for multihop
+no bgp ebgp-requires-policy
+
+# Path selection options
+bgp bestpath as-path multipath-relax
+maximum-paths 4
+```
+
+{/* TODO: Document all router bgp commands */}
+{/* TODO: Explain each option's purpose */}
+
+### Neighbor Configuration
+
+```bash
+router bgp 65001
+  # Define neighbor
+  neighbor 192.0.2.254 remote-as 64512
+  
+  # Description
+  neighbor 192.0.2.254 description "Primary Upstream"
+  
+  # Update source (use specific interface)
+  neighbor 192.0.2.254 update-source eth0
+  
+  # Multihop (for non-directly-connected peers)
+  neighbor 192.0.2.254 ebgp-multihop 2
+  
+  # Timers (keepalive holdtime)
+  neighbor 192.0.2.254 timers 30 90
+  
+  # MD5 authentication
+  neighbor 192.0.2.254 password secret123
+  
+  # Soft reconfiguration (store received routes)
+  neighbor 192.0.2.254 soft-reconfiguration inbound
+  
+  # Passive mode (wait for connections)
+  neighbor 192.0.2.254 passive
+  
+  # BFD integration
+  neighbor 192.0.2.254 bfd
+```
+
+{/* TODO: Complete neighbor command reference */}
+{/* TODO: Add peer-group configuration */}
+
+#### Peer Groups
+
+```bash
+router bgp 65001
+  # Create peer group
+  neighbor upstream peer-group
+  neighbor upstream remote-as external
+  neighbor upstream ebgp-multihop 2
+  neighbor upstream timers 30 90
+  
+  # Apply to neighbors
+  neighbor 192.0.2.254 peer-group upstream
+  neighbor 192.0.2.253 peer-group upstream
+```
+
+{/* TODO: Explain peer-group benefits and usage */}
+
+### Address Family Configuration
+
+```bash
+router bgp 65001
+  # IPv4 Unicast
+  address-family ipv4 unicast
+    # Network to advertise
+    network 203.0.113.0/24
+    
+    # Neighbor-specific settings
+    neighbor 192.0.2.254 activate
+    neighbor 192.0.2.254 route-map EXPORT-UPSTREAM out
+    neighbor 192.0.2.254 route-map IMPORT-UPSTREAM in
+    neighbor 192.0.2.254 prefix-list ALLOWED-OUT out
+    neighbor 192.0.2.254 prefix-list ALLOWED-IN in
+    
+    # Redistribution
+    redistribute static
+    redistribute connected
+    
+    # Aggregation
+    aggregate-address 203.0.113.0/24 summary-only
+  exit-address-family
+  
+  # IPv6 Unicast
+  address-family ipv6 unicast
+    network 2001:db8::/48
+    neighbor 2001:db8::1 activate
+    neighbor 2001:db8::1 route-map EXPORT-V6 out
+  exit-address-family
+```
+
+{/* TODO: Document all address-family commands */}
+{/* TODO: Explain activate requirement */}
+
+<Aside type="caution">
+In FRR, neighbors are not activated in an address family by default. You must explicitly use `neighbor X.X.X.X activate` within each address family.
+</Aside>
+
+## Route Maps
+
+Route maps provide flexible policy control for route filtering and attribute manipulation.
+
+```bash
+# Create route map (permit or deny, sequence number)
+route-map EXPORT-UPSTREAM permit 10
+  match ip address prefix-list MY-PREFIXES
+  set community 65001:100
+  set as-path prepend 65001
+!
+route-map EXPORT-UPSTREAM deny 999
+  # Implicit deny at end (explicit for clarity)
+!
+
+# Match conditions
+route-map EXAMPLE permit 10
+  match ip address prefix-list PREFIXES
+  match as-path ASPATH-LIST
+  match community COMMUNITY-LIST
+  match local-preference 100
+  match metric 50
+!
+
+# Set actions
+route-map EXAMPLE permit 20
+  set local-preference 150
+  set metric 100
+  set as-path prepend 65001 65001 65001
+  set community 65001:200 additive
+  set community 65001:300 delete
+  set origin igp
+!
+```
+
+{/* TODO: Document all route-map match conditions */}
+{/* TODO: Document all route-map set actions */}
+{/* TODO: Explain route-map processing order */}
+
+### Common Route Map Patterns
+
+```bash
+# Mark routes from specific neighbor
+route-map FROM-PEER1 permit 10
+  set local-preference 150
+  set community 65001:1001 additive
+!
+
+# Prepend on export to backup link
+route-map EXPORT-BACKUP permit 10
+  match ip address prefix-list MY-PREFIXES
+  set as-path prepend 65001 65001 65001
+!
+
+# Blackhole community
+route-map BLACKHOLE permit 10
+  match community BLACKHOLE-COMM
+  set ip next-hop 192.0.2.1
+  set local-preference 200
+!
+```
+
+## Prefix Lists
+
+Prefix lists filter routes based on network address and prefix length.
+
+```bash
+# Simple prefix list
+ip prefix-list MY-PREFIXES seq 10 permit 203.0.113.0/24
+
+# With length matching
+ip prefix-list ALLOWED-IN seq 10 permit 0.0.0.0/0 le 24  # Allow up to /24
+ip prefix-list ALLOWED-IN seq 20 deny any
+
+# Block bogons
+ip prefix-list BOGONS seq 10 deny 0.0.0.0/8 le 32
+ip prefix-list BOGONS seq 20 deny 10.0.0.0/8 le 32
+ip prefix-list BOGONS seq 30 deny 127.0.0.0/8 le 32
+ip prefix-list BOGONS seq 40 deny 169.254.0.0/16 le 32
+ip prefix-list BOGONS seq 50 deny 172.16.0.0/12 le 32
+ip prefix-list BOGONS seq 60 deny 192.168.0.0/16 le 32
+ip prefix-list BOGONS seq 100 permit 0.0.0.0/0 le 32
+
+# IPv6 prefix list
+ipv6 prefix-list MY-V6-PREFIXES seq 10 permit 2001:db8::/48
+```
+
+{/* TODO: Explain prefix-list syntax in detail */}
+{/* TODO: Cover ge/le modifiers with examples */}
+
+### Prefix List Syntax
+
+| Element | Description |
+|---------|-------------|
+| `seq N` | Sequence number (determines order) |
+| `permit/deny` | Action to take |
+| `A.B.C.D/LEN` | Prefix to match |
+| `ge N` | Greater than or equal to length |
+| `le N` | Less than or equal to length |
+| `any` | Match any prefix |
+
+## Community Lists
+
+Community lists match BGP community attributes.
+
+```bash
+# Standard community list (simple matching)
+bgp community-list standard MY-COMMUNITY permit 65001:100
+bgp community-list standard MY-COMMUNITY permit 65001:200
+
+# Expanded community list (regex matching)
+bgp community-list expanded UPSTREAM-COMMS permit 64512:.*
+
+# Well-known communities
+bgp community-list standard NO-EXPORT permit no-export
+bgp community-list standard NO-ADVERTISE permit no-advertise
+
+# Large community list
+bgp large-community-list standard MY-LARGE permit 65001:0:100
+```
+
+{/* TODO: Document community list types and matching */}
+{/* TODO: Add regex examples for expanded lists */}
+
+### Using Community Lists
+
+```bash
+route-map CHECK-COMMUNITY permit 10
+  match community MY-COMMUNITY
+  set local-preference 150
+!
+
+route-map CHECK-COMMUNITY permit 20
+  match community NO-EXPORT
+  # Routes with NO-EXPORT community
+!
+```
+
+## Common Configuration Patterns
+
+### Basic Anycast BGP
+
+```bash
+frr version 8.5
+frr defaults traditional
+hostname anycast-node
+!
+router bgp 65001
+  bgp router-id 192.0.2.1
+  bgp log-neighbor-changes
+  no bgp ebgp-requires-policy
+  !
+  neighbor 169.254.169.254 remote-as 64515
+  neighbor 169.254.169.254 description Vultr
+  neighbor 169.254.169.254 ebgp-multihop 2
+  !
+  address-family ipv4 unicast
+    network 203.0.113.0/24
+    neighbor 169.254.169.254 activate
+    neighbor 169.254.169.254 soft-reconfiguration inbound
+    neighbor 169.254.169.254 route-map EXPORT out
+  exit-address-family
+!
+ip prefix-list ANYCAST seq 10 permit 203.0.113.0/24
+!
+route-map EXPORT permit 10
+  match ip address prefix-list ANYCAST
+!
+route-map EXPORT deny 999
+!
+```
+
+### Health Check Integration
+
+```bash
+# Static route controlled by health check
+ip route 203.0.113.0/24 Null0 250
+
+# Track object for health (requires track daemon)
+track 1 ip route 127.0.0.1/32 reachability
+!
+ip route 203.0.113.0/24 Null0 track 1
+```
+
+{/* TODO: Explain health check integration patterns */}
+{/* TODO: Add BFD-based health checking */}
+
+### Multiple Upstream Providers
+
+```bash
+router bgp 65001
+  bgp bestpath as-path multipath-relax
+  !
+  # Provider 1 - Primary
+  neighbor 192.0.2.1 remote-as 64512
+  neighbor 192.0.2.1 description Primary-ISP
+  !
+  # Provider 2 - Backup (prepended)
+  neighbor 192.0.2.2 remote-as 64513  
+  neighbor 192.0.2.2 description Backup-ISP
+  !
+  address-family ipv4 unicast
+    neighbor 192.0.2.1 route-map PRIMARY-EXPORT out
+    neighbor 192.0.2.2 route-map BACKUP-EXPORT out
+  exit-address-family
+!
+route-map PRIMARY-EXPORT permit 10
+  match ip address prefix-list ANYCAST
+!
+route-map BACKUP-EXPORT permit 10
+  match ip address prefix-list ANYCAST
+  set as-path prepend 65001 65001
+!
+```
+
+## Example Configurations
+
+### Complete Anycast Node Configuration
+
+```bash
+frr version 8.5
+frr defaults traditional
+hostname anycast-us-east-1
+log syslog informational
+service integrated-vtysh-config
+!
+router bgp 65001
+  bgp router-id 192.0.2.1
+  bgp log-neighbor-changes
+  timers bgp 30 90
+  bgp graceful-restart
+  !
+  neighbor UPSTREAM peer-group
+  neighbor UPSTREAM ebgp-multihop 2
+  neighbor UPSTREAM timers 30 90
+  !
+  neighbor 169.254.169.254 remote-as 64515
+  neighbor 169.254.169.254 peer-group UPSTREAM
+  neighbor 169.254.169.254 description Vultr-Primary
+  neighbor 169.254.169.254 password secretpassword
+  !
+  address-family ipv4 unicast
+    network 203.0.113.0/24
+    neighbor UPSTREAM activate
+    neighbor UPSTREAM soft-reconfiguration inbound
+    neighbor UPSTREAM route-map IMPORT in
+    neighbor UPSTREAM route-map EXPORT out
+    neighbor UPSTREAM prefix-list BOGONS in
+  exit-address-family
+  !
+  address-family ipv6 unicast
+    network 2001:db8::/48
+    neighbor UPSTREAM activate
+  exit-address-family
+!
+ip prefix-list ANYCAST seq 10 permit 203.0.113.0/24
+!
+ip prefix-list BOGONS seq 10 deny 0.0.0.0/8 le 32
+ip prefix-list BOGONS seq 20 deny 10.0.0.0/8 le 32
+ip prefix-list BOGONS seq 30 deny 127.0.0.0/8 le 32
+ip prefix-list BOGONS seq 40 deny 169.254.0.0/16 le 32
+ip prefix-list BOGONS seq 50 deny 172.16.0.0/12 le 32
+ip prefix-list BOGONS seq 60 deny 192.168.0.0/16 le 32
+ip prefix-list BOGONS seq 100 permit 0.0.0.0/0 le 24
+!
+route-map IMPORT permit 10
+  set local-preference 100
+!
+route-map EXPORT permit 10
+  match ip address prefix-list ANYCAST
+  set community 65001:100
+!
+route-map EXPORT deny 999
+!
+line vty
+!
+```
+
+{/* TODO: Add IPv6-only configuration example */}
+{/* TODO: Add dual-stack configuration example */}
+
+<Aside type="tip">
+Use `show running-config` to view the current configuration and `write memory` to save changes.
+</Aside>
+
+## Related Resources
+
+<CardGrid>
+  <LinkCard
+    title="FRR Setup Guide"
+    href="/guides/frr-setup/"
+    description="Step-by-step FRRouting installation and setup"
+  />
+  <LinkCard
+    title="BGP Attributes Reference"
+    href="/reference/bgp-attributes/"
+    description="Understanding BGP path attributes"
+  />
+  <LinkCard
+    title="Troubleshooting Guide"
+    href="/reference/troubleshooting/"
+    description="Debug FRR configuration issues"
+  />
+</CardGrid>
+
+## External Resources
+
+{/* TODO: Add links to official FRR documentation */}
+
+- [FRRouting Documentation](https://docs.frrouting.org/)
+- [FRR GitHub Repository](https://github.com/FRRouting/frr)
+- [FRR User Guide - BGP](https://docs.frrouting.org/en/latest/bgp.html)

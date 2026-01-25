@@ -1,0 +1,144 @@
+---
+title: Prerequisites for DIY Anycast | What You Need
+description: Discover the technical requirements for building a DIY anycast network. Learn about ASN acquisition, IP space, BGP knowledge, costs, and time investment needed.
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Before diving into anycast configuration, you'll need to gather resources and develop foundational knowledge. This page outlines everything required to build and operate your own anycast network.
+
+{/* TODO: Brief encouraging paragraph about the journey ahead */}
+
+## Technical Requirements
+
+Building an anycast network requires several key resources. Here's what you'll need to acquire:
+
+### ASN (Autonomous System Number)
+
+An ASN is your unique identifier in the global BGP routing table. You'll need one to peer with upstream providers and announce your IP prefixes.
+
+{/* TODO: Explain ASN types (16-bit vs 32-bit), how to obtain from RIRs, and sponsorship options */}
+
+<Aside type="tip">
+  Many LIRs offer ASN sponsorship programs that can significantly reduce costs for hobbyists. Check the [resources section](/resources/getting-asn/) for recommended sponsors.
+</Aside>
+
+### IP Address Space
+
+You'll need at least a /48 IPv6 prefix and ideally a /24 IPv4 prefix (the minimum typically accepted for global BGP announcements).
+
+{/* TODO: Explain minimum prefix sizes, provider independent vs provider assigned, and acquisition options */}
+
+### Servers in Multiple Locations
+
+Anycast requires presence in multiple geographic locations. You'll need servers or VPS instances capable of running BGP software.
+
+{/* TODO: Discuss colocation options, VPS providers that allow BGP, and minimum recommended locations */}
+
+<Aside type="caution">
+  Not all VPS providers allow BGP sessions. Verify BGP support before committing to a provider. We maintain a list in our [recommended providers](/resources/providers/) section.
+</Aside>
+
+### Upstream Connectivity
+
+Each location needs BGP connectivity to the internet, either through direct upstream providers or internet exchange points (IXPs).
+
+{/* TODO: Explain transit vs peering, IXP membership, and connectivity options for hobbyists */}
+
+## Understanding BGP Basics
+
+A working knowledge of BGP is essential for operating an anycast network. Here are the concepts you should understand:
+
+### Core BGP Concepts
+
+Before configuring your first router, familiarize yourself with these fundamentals:
+
+{/* TODO: List and briefly explain: AS path, prefix announcements, BGP communities, route filtering, peering vs transit */}
+
+### Route Filtering and Security
+
+Responsible anycast operation requires proper route filtering to prevent leaks and hijacks.
+
+{/* TODO: Explain IRR, RPKI, prefix filters, and why they matter */}
+
+<Aside type="danger">
+  Misconfigured BGP can disrupt internet routing beyond your network. Always implement proper filters and test configurations carefully before announcing prefixes globally.
+</Aside>
+
+### Monitoring and Troubleshooting
+
+You'll need to monitor your announcements and troubleshoot routing issues:
+
+{/* TODO: Introduce looking glasses, RIPE RIS, BGP tools, and monitoring approaches */}
+
+## Cost Considerations
+
+Running a DIY anycast network involves several cost categories. Here's a realistic breakdown:
+
+### Initial Setup Costs
+
+One-time expenses to get your network operational:
+
+{/* TODO: Breakdown of ASN fees, IP allocation fees, initial hardware/VPS costs */}
+
+### Ongoing Monthly Costs
+
+Recurring expenses to maintain your network:
+
+{/* TODO: Breakdown of hosting, transit/peering fees, RIR membership if applicable */}
+
+### Budget Options
+
+Anycast doesn't have to break the bank. Here are ways to minimize costs:
+
+{/* TODO: Discuss sponsorship programs, free IXP ports, budget VPS providers with BGP support */}
+
+<Aside type="note">
+  Many hobbyists run functional anycast networks for under $100/month across multiple locations. Cost optimization strategies are covered in our [budget guide](/guides/budget-anycast/).
+</Aside>
+
+## Time Investment
+
+Be realistic about the time required to build and operate an anycast network:
+
+### Initial Learning Curve
+
+If you're new to BGP, expect to spend time learning before configuring:
+
+{/* TODO: Estimated hours for learning BGP basics, recommended resources and tutorials */}
+
+### Setup Time
+
+Once you have resources and knowledge, deployment takes time:
+
+{/* TODO: Estimated timeline from ASN acquisition to first announcement */}
+
+### Ongoing Maintenance
+
+Running an anycast network is an ongoing commitment:
+
+{/* TODO: Discuss monitoring, updates, incident response, and realistic time expectations */}
+
+## Knowledge Checkpoints
+
+Before proceeding, ensure you can answer these questions:
+
+{/* TODO: List of self-assessment questions covering BGP basics, resource requirements, and realistic expectations */}
+
+## Next Steps
+
+With an understanding of what's required, you're ready to learn about anycast architecture patterns and plan your network design.
+
+<LinkCard
+  title="Anycast Architecture Patterns"
+  description="Explore common anycast topologies and design patterns for your network deployment."
+  href="/getting-started/architecture/"
+/>
+
+Ready to acquire your ASN and IP space? Check out our resources section:
+
+<LinkCard
+  title="Getting Your ASN"
+  description="Step-by-step guide to acquiring an Autonomous System Number for your anycast network."
+  href="/resources/getting-asn/"
+/>

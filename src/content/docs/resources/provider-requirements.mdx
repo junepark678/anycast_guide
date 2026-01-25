@@ -1,0 +1,172 @@
+---
+title: "Provider Requirements"
+description: "Understand what hosting providers require for BGP sessions. Learn about LOAs, prefix filters, and configuration details for Vultr, BuyVM, and more."
+---
+
+import { Aside, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+
+Before you can announce your prefixes through a hosting provider, you'll need to meet their requirements. This guide covers what providers typically ask for and how to prepare.
+
+## What Providers Verify
+
+Providers perform due diligence before allowing BGP announcements to protect their network and the broader internet.
+Providers typically verify the following:
+- Proof of ASN ownership
+- Proof of IP space authorization
+- Valid IRR objects
+- Valid RPKI ROAs
+- LOA (Letter of Authorization)
+
+<Aside type="tip">
+Prepare all documentation before requesting BGP service. Having everything ready speeds up the approval process significantly—sometimes from weeks to days.
+</Aside>
+
+## Letter of Authorization (LOA)
+
+An LOA is a formal document stating you authorize the provider to announce your prefixes.
+
+### What an LOA Contains
+
+- Your organization/name
+- Your ASN
+- Prefixes being authorized
+- Provider's ASN
+- Date and signature
+
+### LOA Template
+
+```
+LETTER OF AUTHORIZATION
+
+Date: [Date]
+
+To Whom It May Concern,
+
+[Your Name/Organization] is the legitimate holder of AS[Your ASN] 
+and the following IP prefixes:
+
+- [Prefix 1]
+- [Prefix 2]
+
+We hereby authorize [Provider Name] (AS[Provider ASN]) to announce 
+these prefixes on our behalf and accept them for routing.
+
+This authorization is valid until revoked in writing.
+
+Signature: _______________
+Name: [Your Name]
+Contact: [Your Email]
+```
+
+## BGP Session Configuration Details
+
+You'll need to exchange technical details with your provider to establish the BGP session.
+
+### Information You Provide
+
+- Your ASN
+- Prefixes to announce
+- Preferred BGP password (MD5)
+- Contact information
+
+### Information Provider Gives You
+
+- Provider ASN
+- Provider BGP IP address
+- Any specific configuration parameters
+
+### Session Parameters
+
+Some providers have specific requirements for BGP session parameters. These may include:
+- **Multihop settings**
+- **BGP timers**
+- **Maximum prefix limits**
+
+## Common Provider Policies
+
+Providers have varying policies around BGP announcements. Understanding these helps avoid surprises.
+
+### Prefix Length Requirements
+
+Most providers require a minimum prefix length for announcements:
+- IPv4: /24 minimum
+- IPv6: /48 minimum
+
+### RPKI Enforcement
+
+Having valid RPKI ROAs for your prefixes is increasingly a requirement.
+
+<Aside type="caution">
+RPKI enforcement is increasingly common. Always create ROAs before attempting to announce prefixes. Some providers reject announcements immediately if RPKI validation fails.
+</Aside>
+
+### IRR Filtering
+
+Providers often use IRR databases to filter announced prefixes. Ensure your route/route6 objects are correctly set up in the relevant IRR.
+
+### Communities Support
+
+Some providers support BGP communities for traffic engineering. Check with your provider for supported community values and usage.
+
+## Provider Comparison
+
+Different providers have different BGP offerings. Here's a brief overview of popular options for hobbyists.
+
+<Tabs>
+  <TabItem label="Lagrange Cloud">
+    ### Lagrange Cloud
+
+    ***Key Details:**
+    - Setup: Fully automated in the console
+    - Cost: Included with VPS or pay for tunnel
+    - Locations: London
+    - IPv6: Fully supported
+
+    (https://lagrange.cloud/)
+  </TabItem>
+  
+  <TabItem label="iFog">
+    ### iFog
+        
+    **Key Details:**
+    - Setup: Order via website
+    - Cost: Included with VPS
+    - Locations: European focus
+    - IPv6: Fully supported
+    
+    (https://ifog.ch/)
+  </TabItem>
+  <TabItem label="Vultr">
+    ### Vultr
+    
+    **Key Details:**
+    - Setup: Support ticket required
+    - Cost: No additional BGP fee
+    - Locations: 25+ global datacenters
+    - IPv6: Fully supported
+    
+    (https://vultr.com/)
+  </TabItem>
+</Tabs>
+
+## Next Steps
+
+With provider requirements understood, you're ready to configure your routing daemon.
+
+<LinkCard
+  title="BIRD Configuration Guide"
+  description="Configure BIRD to establish BGP sessions and announce your prefixes."
+  href="/guides/bird/"
+/>
+
+<LinkCard
+  title="FRRouting (FRR) Guide"
+  description="Set up FRR for BGP routing on your anycast nodes."
+  href="/guides/frr/"
+/>
+
+<LinkCard
+  title="IRR & RPKI Setup"
+  description="Make sure your route registration is complete before contacting providers."
+  href="/resources/irr-rpki/"
+/>

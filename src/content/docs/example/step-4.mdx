@@ -1,0 +1,326 @@
+---
+title: "Step 4: Provider Setup"
+description: "Configure BGP sessions with cloud providers like Vultr for your anycast deployment. Provider-specific settings and verification."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+With your BIRD configuration ready, it's time to establish BGP sessions with your upstream provider(s). We'll use Vultr as our example, but the concepts apply to other providers.
+
+## Provider Selection
+
+For anycast, you'll want providers that:
+- Support BGP/bring-your-own-IP
+- Have multiple geographic locations
+- Offer reasonable pricing for BGP-enabled instances
+
+<Tabs>
+  <TabItem label="Vultr">
+    - BGP available on all plans
+    - 30+ locations worldwide
+    - $5/month minimum (+ BGP IP fee)
+    - Supports IPv4 and IPv6
+  </TabItem>
+  <TabItem label="Other Providers">
+    Other providers supporting BGP include:
+    - BuyVM (Frantech)
+    - iFog
+    - Mythic Beasts
+    - Various VPS providers with BGP add-ons
+  </TabItem>
+</Tabs>
+
+## Vultr BGP Setup
+
+<Steps>
+1. **Enable BGP on your account**
+   
+   Navigate to Account → BGP in the Vultr dashboard and request BGP access.
+
+2. **Add your ASN and prefixes**
+   
+   Once approved, configure:
+   - Your ASN: `212345`
+   - IPv4 Prefix: `203.0.113.0/24`
+   - IPv6 Prefix: `2001:db8:abcd::/48`
+
+3. **Get BGP session details**
+   
+   Vultr provides:
+   - Neighbor IP (typically `169.254.169.254`)
+   - Vultr's ASN (`64515` or `20473`)
+   - BGP password
+   - Multihop value
+
+4. **Create instances in multiple locations**
+   
+   Deploy servers in different regions (e.g., Los Angeles, Amsterdam, Tokyo)
+</Steps>
+
+<Aside>
+Vultr requires IRR and RPKI to be configured before they'll accept your announcements. Ensure Step 2 is complete.
+</Aside>
+
+## BIRD Configuration for Vultr
+
+Add the following BGP sessions to your BIRD config:
+
+```bird
+# /etc/bird/bird.conf (add to existing config)
+
+# ============================================
+# Vultr BGP Configuration
+# ============================================
+
+define VULTR_ASN = 64515;
+define VULTR_NEIGHBOR = 169.254.169.254;
+
+# Vultr IPv4 BGP Session
+protocol bgp vultr_v4 from upstream_v4 {
+    neighbor VULTR_NEIGHBOR as VULTR_ASN;
+    password "your-vultr-bgp-password";
+    multihop 2;
+    
+    ipv4 {
+        import none;
+        export filter {
+            if is_my_prefix_v4() then accept;
+            reject;
+        };
+    };
+}
+
+# Vultr IPv6 BGP Session
+protocol bgp vultr_v6 from upstream_v6 {
+    neighbor VULTR_NEIGHBOR as VULTR_ASN;
+    password "your-vultr-bgp-password";
+    multihop 2;
+    
+    ipv6 {
+        import none;
+        export filter {
+            if is_my_prefix_v6() then accept;
+            reject;
+        };
+    };
+}
+```
+
+### Complete Configuration Example
+
+Here's the full BIRD configuration with Vultr sessions:
+
+<details>
+<summary>Click to expand full configuration</summary>
+
+```bird
+# /etc/bird/bird.conf
+# Complete Anycast Configuration for AS212345 with Vultr
+
+router id 192.0.2.10;  # Change per server
+
+log syslog all;
+log "/var/log/bird.log" { warning, error, fatal };
+graceful restart wait 15;
+
+# Variables
+define MY_ASN = 212345;
+define MY_IPv4 = 203.0.113.0/24;
+define MY_IPv6 = 2001:db8:abcd::/48;
+define VULTR_ASN = 64515;
+define VULTR_NEIGHBOR = 169.254.169.254;
+
+# Functions
+function is_my_prefix_v4() {
+    if net = MY_IPv4 then return true;
+    return false;
+}
+
+function is_my_prefix_v6() {
+    if net = MY_IPv6 then return true;
+    return false;
+}
+
+# Base protocols
+protocol device { scan time 10; }
+
+protocol direct {
+    ipv4;
+    ipv6;
+    interface "lo";
+}
+
+protocol kernel kernel_v4 {
+    ipv4 { export all; import none; };
+}
+
+protocol kernel kernel_v6 {
+    ipv6 { export all; import none; };
+}
+
+# Static anycast routes
+protocol static static_anycast_v4 {
+    ipv4;
+    route MY_IPv4 blackhole;
+}
+
+protocol static static_anycast_v6 {
+    ipv6;
+    route MY_IPv6 blackhole;
+}
+
+# BGP Templates
+template bgp upstream_v4 {
+    local as MY_ASN;
+    hold time 90;
+    keepalive time 30;
+    graceful restart on;
+}
+
+template bgp upstream_v6 {
+    local as MY_ASN;
+    hold time 90;
+    keepalive time 30;
+    graceful restart on;
+}
+
+# Vultr BGP Sessions
+protocol bgp vultr_v4 from upstream_v4 {
+    neighbor VULTR_NEIGHBOR as VULTR_ASN;
+    password "your-bgp-password";
+    multihop 2;
+    
+    ipv4 {
+        import none;
+        export filter {
+            if is_my_prefix_v4() then accept;
+            reject;
+        };
+    };
+}
+
+protocol bgp vultr_v6 from upstream_v6 {
+    neighbor VULTR_NEIGHBOR as VULTR_ASN;
+    password "your-bgp-password";
+    multihop 2;
+    
+    ipv6 {
+        import none;
+        export filter {
+            if is_my_prefix_v6() then accept;
+            reject;
+        };
+    };
+}
+```
+
+</details>
+
+## Applying Configuration
+
+<Steps>
+1. **Test configuration**
+   ```bash
+   sudo birdc configure check
+   ```
+
+2. **Apply changes**
+   ```bash
+   sudo birdc configure
+   ```
+
+3. **Check BGP session status**
+   ```bash
+   sudo birdc show protocols all vultr_v4
+   ```
+   
+   Look for `Established` state:
+   ```
+   vultr_v4   BGP        ---        up     12:34:56    Established
+     BGP state:          Established
+     Neighbor address:   169.254.169.254
+     Neighbor AS:        64515
+     Local AS:           212345
+   ```
+
+4. **Verify route export**
+   ```bash
+   sudo birdc show route export vultr_v4
+   ```
+   
+   Should show your prefix:
+   ```
+   203.0.113.0/24     blackhole [static_anycast_v4 12:00:00] * (200)
+   ```
+</Steps>
+
+## Verifying Announcements
+
+### From Looking Glass
+
+Check that your prefix is visible globally:
+
+```bash
+# Use a looking glass service
+# RIPE RIS: https://stat.ripe.net/
+# Hurricane Electric: https://bgp.he.net/
+
+# Or use bgpstream
+bgpstream -p 203.0.113.0/24
+```
+
+### From Your Server
+
+```bash
+# Check BGP session state
+sudo birdc show protocols
+
+# Check exported routes
+sudo birdc show route export vultr_v4
+sudo birdc show route export vultr_v6
+
+# Check route details
+sudo birdc show route for 203.0.113.0/24 all
+```
+
+## Troubleshooting
+
+| Symptom | Possible Cause | Solution |
+|---------|----------------|----------|
+| Session stuck in `Active` | Wrong neighbor IP or password | Verify Vultr BGP details |
+| Session stuck in `OpenSent` | Firewall blocking BGP | Allow TCP 179 |
+| Routes not exported | Filter rejecting routes | Check `is_my_prefix_v4()` function |
+| Prefix not visible globally | Missing IRR/RPKI | Complete Step 2 |
+
+<Aside type="caution">
+BGP sessions may take a few minutes to establish. If the session doesn't come up after 5 minutes, check the BIRD logs: `journalctl -u bird -f`
+</Aside>
+
+## Multi-Location Setup
+
+Repeat this setup on servers in different locations:
+
+1. Deploy a new Vultr instance in another region
+2. Copy your BIRD configuration
+3. Update the `router id` to the new server's IP
+4. Apply configuration and verify BGP session
+
+Each server announcing the same prefix creates your anycast network!
+
+## Next Step
+
+With BGP sessions established, let's configure a DNS server to use your anycast IPs.
+
+<LinkCard
+  title="Step 5: DNS Anycast"
+  description="Set up BIND or other DNS servers on your anycast network."
+  href="/example/step-5"
+/>
+
+## Related Documentation
+
+<LinkCard
+  title="Provider Setup Guide"
+  description="Detailed provider configuration and comparison."
+  href="/guides/provider-setup"
+/>

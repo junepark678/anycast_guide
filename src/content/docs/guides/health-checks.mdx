@@ -1,0 +1,456 @@
+---
+title: "BGP Health Checks | Automated Failover Setup"
+description: "Implement BGP health checks for anycast failover. Learn to automate route announcements based on service health with BIRD and FRR examples."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+Health checks are critical for anycast deployments. Without them, a failed service can continue attracting traffic because BGP keeps announcing the route. This guide covers different approaches to health-based BGP route management.
+
+{/* TODO: Expand on why health checks matter for anycast specifically */}
+
+## Why Health Checks Matter
+
+In a traditional unicast setup, a failed server simply stops responding. In anycast, the situation is more complex:
+
+- BGP routes persist even when services fail
+- Traffic continues flowing to the failed node
+- Users experience timeouts rather than automatic failover
+- Recovery requires manual intervention or external automation
+
+{/* TODO: Diagram showing traffic flow to failed node without health checks */}
+
+<Aside type="caution">
+Without health checks, your anycast deployment provides geographic distribution but not automatic failover. The BGP route stays announced regardless of service health.
+</Aside>
+
+## Health Check Approaches
+
+There are several ways to integrate health checks with BGP:
+
+| Approach | Complexity | Response Time | Best For |
+|----------|------------|---------------|----------|
+| **Script-based** | Low | 5-30 seconds | Simple deployments |
+| **BFD (Bidirectional Forwarding Detection)** | Medium | Milliseconds | Fast failover needs |
+| **Routing daemon integration** | Medium | Seconds | Native solutions |
+| **External orchestration** | High | Varies | Complex environments |
+
+{/* TODO: Expand on each approach with tradeoffs */}
+
+## Implementing Health Checks with BIRD
+
+BIRD doesn't have built-in service health checks, but you can implement them using protocol enable/disable or route manipulation.
+
+### Protocol-Based Approach
+
+Create a dedicated protocol for your anycast routes that can be enabled/disabled:
+
+```conf
+# /etc/bird/bird.conf
+
+# Anycast route - can be enabled/disabled by health check
+protocol static anycast_routes {
+    ipv4;
+    route 203.0.113.0/24 blackhole;
+}
+
+# BGP export filter
+filter bgp_export {
+    if proto = "anycast_routes" then accept;
+    reject;
+}
+
+protocol bgp upstream {
+    local as 65001;
+    neighbor 169.254.169.254 as 64515;
+    
+    ipv4 {
+        import none;
+        export filter bgp_export;
+    };
+}
+```
+
+Health check script:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/healthcheck.sh
+
+SERVICE_URL="http://127.0.0.1/health"
+PROTOCOL_NAME="anycast_routes"
+
+check_health() {
+    curl -sf --max-time 2 "$SERVICE_URL" > /dev/null 2>&1
+    return $?
+}
+
+current_state=$(birdc show protocols "$PROTOCOL_NAME" | grep -c "up")
+
+if check_health; then
+    if [ "$current_state" -eq 0 ]; then
+        echo "Service healthy, enabling BGP announcement"
+        birdc enable "$PROTOCOL_NAME"
+    fi
+else
+    if [ "$current_state" -eq 1 ]; then
+        echo "Service unhealthy, disabling BGP announcement"
+        birdc disable "$PROTOCOL_NAME"
+    fi
+fi
+```
+
+{/* TODO: More sophisticated health check logic */}
+
+### Route Injection Approach
+
+Alternatively, inject/remove routes directly:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/route-healthcheck.sh
+
+ANYCAST_PREFIX="203.0.113.0/24"
+
+if check_health; then
+    # Add route via BIRD
+    birdc <<EOF
+configure soft
+protocol static healthcheck {
+    ipv4;
+    route $ANYCAST_PREFIX blackhole;
+}
+EOF
+else
+    # Remove by disabling protocol
+    birdc disable healthcheck
+fi
+```
+
+{/* TODO: Explain tradeoffs between approaches */}
+
+<Aside type="tip">
+Run health checks frequently (every 5-10 seconds) but implement dampening to avoid route flapping during brief service hiccups.
+</Aside>
+
+## Implementing Health Checks with FRR
+
+FRR offers several options for health-based routing, including integration with external scripts.
+
+### Static Route Manipulation
+
+```conf
+! /etc/frr/frr.conf
+
+! Anycast route - controlled by health check
+ip route 203.0.113.0/24 Null0
+
+router bgp 65001
+ address-family ipv4 unicast
+  network 203.0.113.0/24
+ exit-address-family
+!
+```
+
+Health check script using vtysh:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/frr-healthcheck.sh
+
+SERVICE_CHECK="curl -sf http://127.0.0.1/health"
+PREFIX="203.0.113.0/24"
+
+check_health() {
+    $SERVICE_CHECK > /dev/null 2>&1
+    return $?
+}
+
+route_exists() {
+    vtysh -c "show ip route $PREFIX" | grep -q "directly connected"
+    return $?
+}
+
+if check_health; then
+    if ! route_exists; then
+        echo "Service healthy, adding route"
+        vtysh -c "configure terminal" -c "ip route $PREFIX Null0"
+    fi
+else
+    if route_exists; then
+        echo "Service unhealthy, removing route"
+        vtysh -c "configure terminal" -c "no ip route $PREFIX Null0"
+    fi
+fi
+```
+
+{/* TODO: More FRR-specific approaches */}
+
+### Using BGP Neighbor Shutdown
+
+For more aggressive failover, shut down the BGP session entirely:
+
+```bash
+#!/bin/bash
+# Shutdown BGP session when unhealthy
+
+NEIGHBOR_IP="169.254.169.254"
+
+if ! check_health; then
+    vtysh -c "configure terminal" \
+          -c "router bgp 65001" \
+          -c "neighbor $NEIGHBOR_IP shutdown"
+else
+    vtysh -c "configure terminal" \
+          -c "router bgp 65001" \
+          -c "no neighbor $NEIGHBOR_IP shutdown"
+fi
+```
+
+<Aside type="caution">
+Shutting down the BGP session affects all routes, not just the anycast prefix. Use this approach only when the node should be completely removed from service.
+</Aside>
+
+## External Health Check Scripts
+
+Regardless of routing daemon, health checks follow similar patterns. Here are examples for common services:
+
+<Tabs>
+  <TabItem label="HTTP/HTTPS">
+    ```bash
+    #!/bin/bash
+    # HTTP health check
+    
+    URL="http://127.0.0.1/health"
+    TIMEOUT=5
+    EXPECTED_CODE=200
+    
+    response_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+                    --max-time $TIMEOUT "$URL")
+    
+    if [ "$response_code" -eq "$EXPECTED_CODE" ]; then
+        exit 0
+    else
+        exit 1
+    fi
+    ```
+  </TabItem>
+  <TabItem label="DNS">
+    ```bash
+    #!/bin/bash
+    # DNS health check
+    
+    DNS_SERVER="127.0.0.1"
+    TEST_DOMAIN="health.example.com"
+    EXPECTED="healthy"
+    
+    response=$(dig +short +time=2 +tries=1 \
+               @$DNS_SERVER $TEST_DOMAIN TXT | tr -d '"')
+    
+    if [ "$response" = "$EXPECTED" ]; then
+        exit 0
+    else
+        exit 1
+    fi
+    ```
+  </TabItem>
+  <TabItem label="TCP Port">
+    ```bash
+    #!/bin/bash
+    # TCP port health check
+    
+    HOST="127.0.0.1"
+    PORT=443
+    TIMEOUT=5
+    
+    if timeout $TIMEOUT bash -c "cat < /dev/null > /dev/tcp/$HOST/$PORT" 2>/dev/null; then
+        exit 0
+    else
+        exit 1
+    fi
+    ```
+  </TabItem>
+  <TabItem label="Custom Script">
+    ```bash
+    #!/bin/bash
+    # Custom application health check
+    
+    # Run application-specific check
+    if /usr/local/bin/myapp --health-check; then
+        exit 0
+    else
+        exit 1
+    fi
+    ```
+  </TabItem>
+</Tabs>
+
+### Systemd Timer for Health Checks
+
+Run health checks periodically with systemd:
+
+```ini
+# /etc/systemd/system/anycast-healthcheck.service
+[Unit]
+Description=Anycast BGP Health Check
+After=bird.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/healthcheck.sh
+```
+
+```ini
+# /etc/systemd/system/anycast-healthcheck.timer
+[Unit]
+Description=Run anycast health check every 10 seconds
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=10
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+# Enable and start timer
+sudo systemctl enable --now anycast-healthcheck.timer
+```
+
+{/* TODO: Cron alternative, more sophisticated scheduling */}
+
+## Graceful BGP Shutdown
+
+When performing maintenance, use graceful shutdown to drain traffic before taking a node offline.
+
+{/* TODO: Explain graceful shutdown BGP community */}
+
+<Tabs>
+  <TabItem label="BIRD">
+    ```conf
+    # Graceful shutdown filter
+    filter graceful_shutdown {
+        # Add GRACEFUL_SHUTDOWN community
+        bgp_community.add((65535, 0));
+        
+        # Optionally lower local preference
+        bgp_local_pref = 0;
+        
+        accept;
+    }
+    ```
+    
+    Apply during maintenance:
+    ```bash
+    # Enable graceful shutdown
+    birdc configure "/etc/bird/bird-graceful.conf"
+    
+    # Wait for traffic to drain (monitor your metrics)
+    sleep 60
+    
+    # Perform maintenance
+    systemctl stop myservice
+    ```
+  </TabItem>
+  <TabItem label="FRR">
+    ```conf
+    ! Graceful shutdown configuration
+    route-map GRACEFUL-SHUTDOWN permit 10
+     set community 65535:0 additive
+     set local-preference 0
+    !
+    
+    router bgp 65001
+     address-family ipv4 unicast
+      neighbor 169.254.169.254 route-map GRACEFUL-SHUTDOWN out
+     exit-address-family
+    !
+    ```
+    
+    Or use the built-in command:
+    ```bash
+    vtysh -c "configure terminal" \
+          -c "router bgp 65001" \
+          -c "bgp graceful-shutdown"
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside>
+The GRACEFUL_SHUTDOWN community (65535:0) is defined in RFC 8326. Properly configured peers will lower the preference of routes with this community, causing traffic to shift to other nodes.
+</Aside>
+
+## Monitoring and Alerting
+
+Health check systems should be monitored to ensure they're working correctly.
+
+{/* TODO: Expand monitoring recommendations */}
+
+### Key Metrics to Track
+
+- Health check execution success/failure
+- Time since last successful check
+- BGP route announcement state
+- Route flap frequency
+
+### Example Prometheus Metrics
+
+```bash
+#!/bin/bash
+# Health check with Prometheus metrics output
+
+METRICS_FILE="/var/lib/prometheus/node-exporter/anycast.prom"
+
+check_health() {
+    # Your health check logic
+    return $?
+}
+
+start_time=$(date +%s.%N)
+check_health
+result=$?
+end_time=$(date +%s.%N)
+
+duration=$(echo "$end_time - $start_time" | bc)
+
+cat > "$METRICS_FILE" << EOF
+# HELP anycast_health_check_success Whether the health check succeeded
+# TYPE anycast_health_check_success gauge
+anycast_health_check_success $([[ $result -eq 0 ]] && echo 1 || echo 0)
+
+# HELP anycast_health_check_duration_seconds Health check duration
+# TYPE anycast_health_check_duration_seconds gauge
+anycast_health_check_duration_seconds $duration
+
+# HELP anycast_health_check_timestamp_seconds Last check timestamp
+# TYPE anycast_health_check_timestamp_seconds gauge
+anycast_health_check_timestamp_seconds $(date +%s)
+EOF
+```
+
+{/* TODO: Alerting rules, dashboard examples */}
+
+<Aside type="caution">
+Alert on health check failures, but also alert when health checks stop running entirely. A stopped health check script means no failover protection.
+</Aside>
+
+## Next Steps
+
+<LinkCard
+  title="Troubleshooting Reference"
+  description="Common issues and solutions for anycast deployments."
+  href="/reference/troubleshooting"
+/>
+
+<LinkCard
+  title="BIRD Setup Guide"
+  description="Complete BIRD configuration for anycast."
+  href="/guides/bird-setup"
+/>
+
+<LinkCard
+  title="FRRouting Setup Guide"
+  description="Complete FRR configuration for anycast."
+  href="/guides/frr-setup"
+/>

@@ -1,0 +1,94 @@
+---
+title: "Step 1: Acquiring IPs & ASN"
+description: "Learn how to obtain your own IP address space and Autonomous System Number (ASN) for anycast deployment. Step-by-step guide for registration with RIRs and LIRs."
+---
+
+import { Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+In this first step, we'll walk through acquiring the essential resources needed for anycast: your own IP address space and an Autonomous System Number (ASN).
+
+## What You'll Need
+
+Before deploying anycast, you need two key resources:
+
+1. **IP Address Space** - A prefix (typically /24 for IPv4, /48 for IPv6) that you'll announce from multiple locations
+2. **Autonomous System Number (ASN)** - A unique identifier for your network in BGP
+
+<Aside>
+For this example, we'll assume you're acquiring resources through an LIR (Local Internet Registry) or a provider that can sponsor your resources. Direct RIR membership is also an option but involves higher costs.
+</Aside>
+
+## Choosing Your Path
+
+There are several ways to obtain IP space and an ASN:
+
+| Method | Cost | Complexity | Best For |
+|--------|------|------------|----------|
+| LIR Sponsorship | Low | Low | Hobbyists, small projects |
+| Provider Allocation | Varies | Low | Single-provider deployments |
+| Direct RIR Membership | High | Medium | Organizations with ongoing needs |
+
+## Example: Using an LIR
+
+For our example deployment, we'll use a hypothetical LIR to obtain:
+
+- **ASN**: AS65536
+- **IPv6 Prefix**: 2001:db8:abcd::/48
+
+<Steps>
+1. **Research LIRs**
+2. **Submit your application**
+3. **Receive your allocations**
+4. **Document your resources**
+</Steps>
+
+## Cost Considerations
+
+Typical costs for LIR sponsorship:
+
+- **Initial Setup**: $50-150 one-time
+- **Annual Fees**: $50-200/year for ASN + IP maintenance
+- **IPv4 Space**: May have additional costs due to scarcity
+
+<Aside type="tip">
+IPv6 space is generally much easier and cheaper to obtain than IPv4. Consider starting with IPv6-only if budget is a concern.
+</Aside>
+
+## Verification
+
+After receiving your resources, verify them in public databases:
+
+```bash
+# Check your ASN registration
+whois AS212345
+
+# Check your IPv4 prefix
+whois 203.0.113.0/24
+
+# Check your IPv6 prefix  
+whois 2001:db8:abcd::/48
+```
+
+## Next Step
+
+Once you have your IP space and ASN, you need to register them in the Internet Routing Registry (IRR) and set up RPKI for route origin validation.
+
+<LinkCard
+  title="Step 2: IRR & RPKI Setup"
+  description="Register your routes and enable cryptographic validation."
+  href="/example/step-2"
+/>
+
+## Related Documentation
+
+<LinkCard
+  title="Acquiring IP Space"
+  description="Detailed guide on obtaining IP addresses for anycast."
+  href="/resources/acquiring-ip-space"
+/>
+
+<LinkCard
+  title="Acquiring an ASN"
+  description="Complete guide to ASN registration and requirements."
+  href="/resources/acquiring-asn"
+/>

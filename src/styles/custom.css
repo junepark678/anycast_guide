@@ -1,0 +1,54 @@
+/* Custom theme for anycast.guide */
+
+/* Color palette */
+:root {
+	--shadow-grey: #1f2027;
+	--blush-rose: #e75a7c;
+	--glaucous: #6e75a8;
+	--muted-teal: #89bd9e;
+	--apricot-cream: #f0c987;
+}
+/* Dark mode colors. */
+:root {
+	--sl-color-accent-low: #3b161e;
+	--sl-color-accent: #b72c55;
+	--sl-color-accent-high: #ecb9c1;
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #ededf1;
+	--sl-color-gray-2: #c7c8cd;
+	--sl-color-gray-3: #a2a3ac;
+	--sl-color-gray-4: #565760;
+	--sl-color-gray-5: #36383f;
+	--sl-color-gray-6: #25262d;
+	--sl-color-black: #17181b;
+}
+/* Light mode colors. */
+:root[data-theme='light'] {
+	--sl-color-accent-low: #f2ccd1;
+	--sl-color-accent: #9e0741;
+	--sl-color-accent-high: #551b29;
+	--sl-color-white: #17181b;
+	--sl-color-gray-1: #25262d;
+	--sl-color-gray-2: #36383f;
+	--sl-color-gray-3: #565760;
+	--sl-color-gray-4: #898b94;
+	--sl-color-gray-5: #c1c2c6;
+	--sl-color-gray-6: #ededf1;
+	--sl-color-gray-7: #f6f6f8;
+	--sl-color-black: #ffffff;
+}
+
+/* Hero gradient for splash pages */
+.hero {
+	background: linear-gradient(135deg, #6e75a8 0%, #89bd9e 50%, #f0c987 100%);
+	padding: 3rem 3rem;
+	border-radius: 0.5rem;
+	margin-bottom: 2rem;
+}
+
+/* Ensure hero text is readable on gradient */
+.tagline {
+	color: var(--shadow-grey);
+}
+
+

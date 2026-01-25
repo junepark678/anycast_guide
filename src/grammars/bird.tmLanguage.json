@@ -1,0 +1,123 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "BIRD",
+  "scopeName": "source.bird",
+  "fileTypes": ["conf"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#protocols" },
+    { "include": "#functions" },
+    { "include": "#constants" },
+    { "include": "#operators" },
+    { "include": "#variables" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.bird",
+          "match": "#.*$"
+        },
+        {
+          "name": "comment.block.bird",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.bird",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.bird",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.ip.bird",
+          "match": "\\b(?:\\d{1,3}\\.){3}\\d{1,3}(?:/\\d{1,2})?\\b"
+        },
+        {
+          "name": "constant.numeric.ipv6.bird",
+          "match": "\\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}(?:/\\d{1,3})?\\b"
+        },
+        {
+          "name": "constant.numeric.bird",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.bird",
+          "match": "\\b(if|then|else|case|for|do|while|switch|return|accept|reject|print|printn|quitbird)\\b"
+        },
+        {
+          "name": "keyword.declaration.bird",
+          "match": "\\b(protocol|template|filter|function|table|define|router|include|log|debug|mrtdump|timeformat|graceful|restart|ipv4|ipv6|channel|import|export|preference|disabled|description)\\b"
+        },
+        {
+          "name": "keyword.other.bird",
+          "match": "\\b(from|to|all|none|where|primary|secondary|tertiary|local|neighbor|multihop|next|hop|self|via|interface|source|address|table|kernel|learn|persist|scan|time|check|link|merged|export|import|limit|action|block|restart|disable|keep|filtered|receive|generate|as|path|prepend|delete|first|last|len|empty|filter|match|defined|type|pair|quad|ec|lc|rd|set|prefix|int|bool|string|bgppath|bgpmask|clist|eclist|lclist)\\b"
+        }
+      ]
+    },
+    "protocols": {
+      "patterns": [
+        {
+          "name": "entity.name.type.protocol.bird",
+          "match": "\\b(bgp|ospf|ospf3|rip|ripng|static|direct|kernel|device|pipe|bfd|babel|radv|rpki|mrt|perf)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "support.function.bird",
+          "match": "\\b(add|delete|contains|reset|flush|format|route_distinguisher|roa_check|net_martian|password|hold|keepalive|startup|connect|retry|error|wait|ttl|security|setkey|passive|rr|client|cluster|confederation|member|capabilities|advertise|hostname|interpret|communities|extended|large|long|lived|stale|med|metric|igp|deterministic|compare|router|path|origin|next|prefer|older|missing|lladdr|check|link|bfd|strict|bind|dual|add|paths|tx|rx|interval|multiplier|idle|min|cost|ecmp|weight|limit|merge|stub|nssa|translator|tick|instance|priority|poll|neighbors|authentication|simple|cryptographic|algorithm|keyed|hmac|networks|hidden|summary|tag|external|internal|ia|inter|area|intra|nssa2|ext1|ext2|v2|v3|vlsm|multicast|infinity|triggered|updates|version|split|horizon|poison|reverse|update|timeout|garbage|port|ecmp|auto|iface|direct|recursive|norecursive|tos|realm|krt_source|krt_metric|krt_prefsrc|krt_realm|krt_scope|krt_mtu|krt_window|krt_rtt|krt_rttvar|krt_sstresh|krt_cwnd|krt_advmss|krt_reordering|krt_hoplimit|krt_initcwnd|krt_features|krt_rto_min|krt_initrwnd|krt_quickack|krt_lock_mtu|krt_lock_window|krt_lock_rtt|krt_lock_rttvar|krt_lock_sstresh|krt_lock_cwnd|krt_lock_advmss|krt_lock_reordering|krt_lock_hoplimit|krt_lock_initcwnd|krt_lock_features|krt_lock_rto_min|krt_lock_initrwnd|krt_lock_quickack|igp_metric|true|false|on|off|yes|no)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.bird",
+          "match": "\\b(true|false|on|off|yes|no|blackhole|unreachable|prohibit)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.bird",
+          "match": "(\\+|\\-|\\*|/|%|&|\\||\\^|~|!|<|>|=|\\?|:|\\.|,|;|\\{|\\}|\\(|\\)|\\[|\\])"
+        },
+        {
+          "name": "keyword.operator.comparison.bird",
+          "match": "(==|!=|<=|>=|&&|\\|\\||\\.\\.)"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.bird",
+          "match": "\\b(net|scope|preference|proto|source|cast|dest|ifname|ifindex|weight|gw|onlink|bgp_path|bgp_local_pref|bgp_med|bgp_origin|bgp_next_hop|bgp_atomic_aggr|bgp_aggregator|bgp_community|bgp_ext_community|bgp_large_community|bgp_originator_id|bgp_cluster_list|ospf_metric1|ospf_metric2|ospf_tag|ospf_router_id|rip_metric|rip_tag|krt_source|krt_metric)\\b"
+        }
+      ]
+    }
+  }
+}

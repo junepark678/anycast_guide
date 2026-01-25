@@ -1,0 +1,98 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "FRR",
+  "scopeName": "source.frr",
+  "fileTypes": ["conf"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#commands" },
+    { "include": "#keywords" },
+    { "include": "#constants" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.exclamation.frr",
+          "match": "^\\s*!.*$"
+        },
+        {
+          "name": "comment.line.number-sign.frr",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.frr",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.frr",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.ip.frr",
+          "match": "\\b(?:\\d{1,3}\\.){3}\\d{1,3}(?:/\\d{1,2})?\\b"
+        },
+        {
+          "name": "constant.numeric.ipv6.frr",
+          "match": "\\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}(?:/\\d{1,3})?\\b"
+        },
+        {
+          "name": "constant.numeric.asn.frr",
+          "match": "\\b\\d{1,10}\\b"
+        }
+      ]
+    },
+    "commands": {
+      "patterns": [
+        {
+          "name": "keyword.control.frr",
+          "match": "^\\s*(no|do|exit|end|configure|terminal|write|show|clear|debug|undebug)\\b"
+        },
+        {
+          "name": "entity.name.type.frr",
+          "match": "^\\s*(router|interface|ip|ipv6|line|hostname|password|enable|service|logging|access-list|prefix-list|route-map|community-list|as-path|address-family|vrf|segment-routing|traffic-eng)\\b"
+        },
+        {
+          "name": "keyword.declaration.frr",
+          "match": "\\b(bgp|ospf|ospf6|isis|rip|ripng|static|eigrp|babel|bfd|pim|ldp|nhrp|pbr|sharp|vrrp|mgmt)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.bgp.frr",
+          "match": "\\b(neighbor|remote-as|update-source|ebgp-multihop|next-hop-self|soft-reconfiguration|inbound|outbound|send-community|extended|standard|both|route-reflector-client|confederation|identifier|peers|local-as|no-prepend|replace-as|dual-as|allowas-in|override|weight|distribute-list|filter-list|prefix-list|route-map|maximum-prefix|default-originate|capability|dynamic|graceful-restart|timers|keepalive|holdtime|advertisement-interval|connect|activate|network|aggregate-address|summary-only|as-set|redistribute|connected|kernel|static|ospf|isis|metric|route-map|bestpath|as-path|ignore|confed|multipath-relax|compare-routerid|med|missing-as-worst|always-compare-med|deterministic-med|router-id|cluster-id|log-neighbor-changes|enforce-first-as|fast-external-failover|graceful-restart|stalepath-time|selection-deferral-time|rib-stale-time|preserve-fw-state|restart-time)\\b"
+        },
+        {
+          "name": "keyword.other.ospf.frr",
+          "match": "\\b(area|range|virtual-link|stub|no-summary|nssa|default-information-originate|translate|candidate|always|never|default-cost|network|point-to-point|point-to-multipoint|broadcast|non-broadcast|passive-interface|default|auto-cost|reference-bandwidth|distance|administrative|external|inter-area|intra-area|spf|timers|throttle|delay|initial|hold|maximum|refresh|interval|retransmit|dead|hello|priority|cost|authentication|message-digest|key|md5|distribute-list|default-metric|router-info|opaque|mpls-te|segment-routing)\\b"
+        },
+        {
+          "name": "keyword.other.general.frr",
+          "match": "\\b(permit|deny|any|seq|le|ge|in|out|match|set|call|on-match|next|goto|continue|as-path|community|metric|local-preference|origin|tag|weight|ip|ipv6|next-hop|peer-address|self|unchanged|additive|delete|none|internet|local-AS|no-advertise|no-export|graceful-shutdown|blackhole|Null0|reject)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.frr",
+          "match": "\\b(igp|incomplete|egp|internal|external|type-1|type-2|true|false)\\b"
+        }
+      ]
+    }
+  }
+}

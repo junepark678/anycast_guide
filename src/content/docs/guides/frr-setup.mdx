@@ -1,0 +1,286 @@
+---
+title: "FRRouting BGP Setup | Anycast Configuration Guide"
+description: "Configure FRRouting (FRR) for anycast BGP routing. Step-by-step setup guide covering installation, BGP peering, prefix announcements, and route maps."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+FRRouting (FRR) is a powerful open-source routing suite that provides BGP, OSPF, IS-IS, and other routing protocols. Its Cisco-like CLI makes it familiar to network engineers, and it's widely used in production anycast deployments.
+
+{/* TODO: Brief comparison with BIRD, when to choose FRR */}
+
+## Introduction to FRRouting
+
+FRRouting evolved from Quagga and is actively maintained by a large community. It uses a modular architecture with separate daemons for each routing protocol, managed through the `vtysh` unified shell.
+
+{/* TODO: Expand on FRR architecture, daemon structure */}
+
+<Aside>
+FRR uses a Cisco IOS-like command syntax. If you have experience with Cisco or Juniper routers, FRR will feel familiar.
+</Aside>
+
+## Installation
+
+<Tabs>
+  <TabItem label="Debian/Ubuntu">
+    ```bash
+    # Add FRR GPG key
+    curl -s https://deb.frrouting.org/frr/keys.gpg | sudo tee /usr/share/keyrings/frrouting.gpg > /dev/null
+
+    # Add FRR repository
+    echo deb '[signed-by=/usr/share/keyrings/frrouting.gpg]' https://deb.frrouting.org/frr $(lsb_release -s -c) frr-stable | sudo tee /etc/apt/sources.list.d/frr.list
+
+    # Install FRR
+    sudo apt update
+    sudo apt install frr frr-pythontools
+
+    # Verify installation
+    vtysh -c "show version"
+    ```
+
+    {/* TODO: Notes about version selection (stable vs latest) */}
+  </TabItem>
+  <TabItem label="RHEL/Rocky">
+    ```bash
+    # Add FRR repository
+    sudo tee /etc/yum.repos.d/frr.repo << 'EOF'
+    [frr]
+    name=FRRouting
+    baseurl=https://rpm.frrouting.org/repo/$releasever/$basearch
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://rpm.frrouting.org/repo/RPM-GPG-KEY-FRR
+    EOF
+
+    # Install FRR
+    sudo dnf install frr frr-pythontools
+
+    # Verify installation
+    vtysh -c "show version"
+    ```
+
+    {/* TODO: RHEL/Rocky specific notes */}
+  </TabItem>
+  <TabItem label="From Source">
+    ```bash
+    # Install dependencies
+    sudo apt install git autoconf automake libtool make \
+      libreadline-dev texinfo pkg-config libpam0g-dev \
+      libjson-c-dev bison flex python3-dev python3-sphinx \
+      install-info build-essential libsnmp-dev perl \
+      libcap-dev libelf-dev libprotobuf-c-dev protobuf-c-compiler
+
+    # Clone repository
+    git clone https://github.com/FRRouting/frr.git
+    cd frr
+
+    # Build
+    ./bootstrap.sh
+    ./configure --prefix=/usr --sysconfdir=/etc/frr --localstatedir=/var/run/frr
+    make
+    sudo make install
+    ```
+
+    {/* TODO: Explain why you might build from source */}
+  </TabItem>
+</Tabs>
+
+### Enable Required Daemons
+
+After installation, enable the BGP daemon in `/etc/frr/daemons`:
+
+```conf
+# /etc/frr/daemons
+bgpd=yes
+zebra=yes
+```
+
+```bash
+# Restart FRR to apply changes
+sudo systemctl restart frr
+```
+
+{/* TODO: Explain each daemon's purpose */}
+
+## Basic Configuration with vtysh
+
+FRR uses `vtysh` as its unified command-line interface. You can configure FRR interactively or by editing `/etc/frr/frr.conf`.
+
+```bash
+# Enter vtysh
+sudo vtysh
+
+# Enter configuration mode
+configure terminal
+
+# Set hostname and basic settings
+hostname anycast-node-01
+password your-password
+enable password your-enable-password
+
+# Save configuration
+write memory
+```
+
+{/* TODO: Explain configuration modes, privilege levels */}
+
+<Aside type="tip">
+You can also run commands directly: `vtysh -c "show bgp summary"` without entering the interactive shell.
+</Aside>
+
+## Configuring BGP Daemon
+
+Configure BGP for your anycast deployment:
+
+```conf
+! /etc/frr/frr.conf
+
+router bgp 65001
+ bgp router-id 192.0.2.1
+ no bgp default ipv4-unicast
+ 
+ ! Upstream neighbor configuration
+ neighbor 169.254.169.254 remote-as 64512
+ neighbor 169.254.169.254 password your-bgp-password
+ neighbor 169.254.169.254 ebgp-multihop 2
+ 
+ address-family ipv4 unicast
+  neighbor 169.254.169.254 activate
+  neighbor 169.254.169.254 soft-reconfiguration inbound
+  neighbor 169.254.169.254 route-map EXPORT out
+  neighbor 169.254.169.254 route-map IMPORT in
+ exit-address-family
+!
+```
+
+{/* TODO: Explain each configuration option, BGP timers, graceful restart */}
+
+## Announcing Your Prefixes
+
+Create static routes and announce them via BGP:
+
+```conf
+! Define static routes for your anycast prefixes
+ip route 203.0.113.0/24 Null0
+
+router bgp 65001
+ address-family ipv4 unicast
+  network 203.0.113.0/24
+ exit-address-family
+!
+```
+
+{/* TODO: Explain null routes, network statements, redistribution options */}
+
+<Aside type="caution">
+Ensure your prefixes are registered in an IRR database and you have proper ROA records. Misconfigured announcements can be filtered or cause routing issues.
+</Aside>
+
+## Filtering and Route Maps
+
+Route maps provide powerful filtering and manipulation capabilities:
+
+```conf
+! Prefix list for your anycast prefixes
+ip prefix-list MY-PREFIXES seq 10 permit 203.0.113.0/24
+
+! Route map for exports
+route-map EXPORT permit 10
+ match ip address prefix-list MY-PREFIXES
+!
+route-map EXPORT deny 20
+!
+
+! Route map for imports (deny all for anycast)
+route-map IMPORT deny 10
+!
+
+! Optional: AS path prepending for traffic engineering
+route-map EXPORT-PREPEND permit 10
+ match ip address prefix-list MY-PREFIXES
+ set as-path prepend 65001 65001
+!
+```
+
+{/* TODO: More complex filtering examples, communities, local preference */}
+
+## Testing Your Configuration
+
+<Steps>
+1. **Check BGP neighbor status**
+   ```bash
+   sudo vtysh -c "show bgp summary"
+   ```
+
+2. **View detailed neighbor information**
+   ```bash
+   sudo vtysh -c "show bgp neighbors 169.254.169.254"
+   ```
+
+3. **Verify advertised routes**
+   ```bash
+   sudo vtysh -c "show bgp ipv4 unicast neighbors 169.254.169.254 advertised-routes"
+   ```
+
+4. **Check routing table**
+   ```bash
+   sudo vtysh -c "show ip route"
+   ```
+</Steps>
+
+{/* TODO: Interpret output, common issues to look for */}
+
+## Common FRR/vtysh Commands
+
+Essential commands for managing your FRR BGP configuration:
+
+```bash
+# Show BGP summary (neighbor states)
+show bgp summary
+
+# Show detailed neighbor info
+show bgp neighbors <ip>
+
+# Show BGP routes
+show bgp ipv4 unicast
+
+# Show routes advertised to a neighbor
+show bgp ipv4 unicast neighbors <ip> advertised-routes
+
+# Show routes received from a neighbor
+show bgp ipv4 unicast neighbors <ip> received-routes
+
+# Clear BGP session (soft reset)
+clear bgp ipv4 unicast <ip> soft out
+
+# Enter configuration mode
+configure terminal
+
+# Save configuration
+write memory
+
+# Show running configuration
+show running-config
+```
+
+{/* TODO: More commands, debugging tips */}
+
+## Next Steps
+
+<LinkCard
+  title="FRR Configuration Reference"
+  description="Complete reference for FRRouting BGP configuration options."
+  href="/reference/frr-config"
+/>
+
+<LinkCard
+  title="BGP Health Checks"
+  description="Implement automated health checks and failover for your anycast network."
+  href="/guides/health-checks"
+/>
+
+<LinkCard
+  title="Provider Setup Guide"
+  description="Connect FRR to your upstream BGP provider."
+  href="/guides/provider-setup"
+/>

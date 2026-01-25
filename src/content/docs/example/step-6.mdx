@@ -1,0 +1,347 @@
+---
+title: "Step 6: Health Checks & Failover"
+description: "Implement automated health monitoring and BGP failover for your anycast deployment. Ensure traffic routes away from unhealthy nodes."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+The final piece of a robust anycast deployment is automated health checking. When a service becomes unhealthy, the node should stop announcing its BGP routes, causing traffic to fail over to healthy nodes.
+
+## Why Health Checks Matter
+
+Without health checks, a node could:
+- Announce routes while the DNS service is down
+- Attract traffic it can't serve
+- Create a "black hole" for a portion of your users
+
+Health checks ensure that only nodes with healthy services attract traffic.
+
+<Aside type="caution">
+Health checks are critical for production anycast deployments. A node announcing routes with a failed service is worse than no node at all.
+</Aside>
+
+## Health Check Approaches
+
+| Approach | Complexity | Flexibility | Best For |
+|----------|------------|-------------|----------|
+| Shell script + cron | Low | Medium | Simple deployments |
+| Dedicated daemon | Medium | High | Production use |
+| BIRD BFD | Low | Low | Link-level checks |
+
+## Shell Script Approach
+
+Create a health check script that controls BIRD announcements:
+
+### The Health Check Script
+
+Create `/usr/local/bin/anycast-healthcheck.sh`:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/anycast-healthcheck.sh
+# Anycast health check for DNS service
+
+set -euo pipefail
+
+# Configuration
+ANYCAST_IP="203.0.113.1"
+CHECK_DOMAIN="example.com"
+EXPECTED_RESULT="203.0.113.10"
+BIRD_PROTOCOL="static_anycast_v4"
+STATE_FILE="/var/run/anycast-healthy"
+LOG_TAG="anycast-healthcheck"
+
+# Logging function
+log() {
+    logger -t "$LOG_TAG" "$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1"
+}
+
+# Check if DNS is responding correctly
+check_dns() {
+    local result
+    result=$(dig +short +time=2 +tries=1 @127.0.0.1 "$CHECK_DOMAIN" A 2>/dev/null || echo "FAILED")
+    
+    if [[ "$result" == "$EXPECTED_RESULT" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Enable BGP announcements
+enable_announcement() {
+    if [[ ! -f "$STATE_FILE" ]]; then
+        log "Enabling BGP announcement - service healthy"
+        birdc enable "$BIRD_PROTOCOL" > /dev/null 2>&1 || true
+        birdc enable "static_anycast_v6" > /dev/null 2>&1 || true
+        touch "$STATE_FILE"
+    fi
+}
+
+# Disable BGP announcements
+disable_announcement() {
+    if [[ -f "$STATE_FILE" ]]; then
+        log "Disabling BGP announcement - service unhealthy"
+        birdc disable "$BIRD_PROTOCOL" > /dev/null 2>&1 || true
+        birdc disable "static_anycast_v6" > /dev/null 2>&1 || true
+        rm -f "$STATE_FILE"
+    fi
+}
+
+# Main check logic
+main() {
+    local failures=0
+    local max_failures=3
+    
+    for ((i=1; i<=max_failures; i++)); do
+        if check_dns; then
+            enable_announcement
+            exit 0
+        fi
+        failures=$((failures + 1))
+        sleep 1
+    done
+    
+    # All checks failed
+    log "Health check failed after $max_failures attempts"
+    disable_announcement
+    exit 1
+}
+
+main "$@"
+```
+
+Make it executable:
+
+```bash
+sudo chmod +x /usr/local/bin/anycast-healthcheck.sh
+```
+
+### Systemd Timer Setup
+
+Create a systemd service and timer for regular health checks:
+
+**Service file** (`/etc/systemd/system/anycast-healthcheck.service`):
+
+```ini
+[Unit]
+Description=Anycast Health Check
+After=bird.service named.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/anycast-healthcheck.sh
+User=root
+```
+
+**Timer file** (`/etc/systemd/system/anycast-healthcheck.timer`):
+
+```ini
+[Unit]
+Description=Run Anycast Health Check every 10 seconds
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=10
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable anycast-healthcheck.timer
+sudo systemctl start anycast-healthcheck.timer
+```
+
+## BIRD Configuration Updates
+
+Modify your BIRD config to support enabling/disabling protocols:
+
+```bird
+# Static routes that can be disabled by health checks
+protocol static static_anycast_v4 {
+    ipv4;
+    route 203.0.113.0/24 blackhole;
+    # disabled;  # Uncomment to start disabled
+}
+
+protocol static static_anycast_v6 {
+    ipv6;
+    route 2001:db8:abcd::/48 blackhole;
+    # disabled;  # Uncomment to start disabled
+}
+```
+
+## Advanced: Dedicated Health Check Daemon
+
+For more sophisticated health checking, consider using a dedicated tool:
+
+<Tabs>
+  <TabItem label="ExaBGP">
+ExaBGP can announce routes based on external health check results:
+
+```python
+#!/usr/bin/env python3
+# /etc/exabgp/healthcheck.py
+
+import subprocess
+import sys
+
+def check_dns():
+    try:
+        result = subprocess.run(
+            ['dig', '+short', '@127.0.0.1', 'example.com'],
+            capture_output=True, text=True, timeout=5
+        )
+        return '203.0.113.10' in result.stdout
+    except:
+        return False
+
+if check_dns():
+    print('announce route 203.0.113.0/24 next-hop self')
+else:
+    print('withdraw route 203.0.113.0/24 next-hop self')
+
+sys.stdout.flush()
+```
+  </TabItem>
+  <TabItem label="Healthchecked">
+Use the `exabgp-healthcheck` or similar tools designed for this purpose:
+
+```bash
+# Install from package manager or pip
+pip install exabgp-healthcheck
+
+# Configuration example
+healthcheck:
+  interval: 5
+  timeout: 3
+  checks:
+    - type: dns
+      host: 127.0.0.1
+      query: example.com
+      expected: 203.0.113.10
+  actions:
+    healthy: "birdc enable static_anycast_v4"
+    unhealthy: "birdc disable static_anycast_v4"
+```
+  </TabItem>
+</Tabs>
+
+## Testing Failover
+
+<Steps>
+1. **Verify health check is running**
+   ```bash
+   sudo systemctl status anycast-healthcheck.timer
+   sudo journalctl -u anycast-healthcheck -f
+   ```
+
+2. **Check current state**
+   ```bash
+   sudo birdc show protocols | grep static_anycast
+   # Should show "up" when healthy
+   ```
+
+3. **Simulate failure**
+   ```bash
+   # Stop DNS service
+   sudo systemctl stop named
+   
+   # Watch health check disable routes
+   sudo journalctl -u anycast-healthcheck -f
+   ```
+
+4. **Verify routes withdrawn**
+   ```bash
+   sudo birdc show protocols | grep static_anycast
+   # Should show "disabled" or no export
+   
+   sudo birdc show route export vultr_v4
+   # Should be empty
+   ```
+
+5. **Restore service**
+   ```bash
+   sudo systemctl start named
+   
+   # Routes should be re-announced
+   sudo birdc show route export vultr_v4
+   ```
+</Steps>
+
+## Monitoring and Alerting
+
+Set up monitoring to track health check status:
+
+```bash
+# Prometheus metrics (example endpoint)
+# Add to your monitoring stack
+
+# Simple file-based status
+cat /var/run/anycast-healthy && echo "HEALTHY" || echo "UNHEALTHY"
+```
+
+### Alerting Considerations
+
+- Alert when a node has been unhealthy for extended periods
+- Alert when multiple nodes become unhealthy simultaneously
+- Track health check history for debugging
+
+## Complete Deployment Checklist
+
+Your anycast deployment is now complete! Final verification:
+
+- [ ] **Step 1**: IP space and ASN acquired
+- [ ] **Step 2**: IRR and RPKI configured
+- [ ] **Step 3**: BIRD installed and configured
+- [ ] **Step 4**: BGP sessions established with providers
+- [ ] **Step 5**: DNS service running on anycast IPs
+- [ ] **Step 6**: Health checks controlling BGP announcements
+
+## Testing End-to-End
+
+```bash
+# From an external location, query your anycast DNS
+dig @203.0.113.1 example.com
+
+# Check which server responded (add TXT record with hostname)
+dig @203.0.113.1 whoami.example.com TXT
+
+# Verify from multiple geographic locations
+# Use RIPE Atlas or online DNS checkers
+```
+
+## Next Steps
+
+Congratulations on completing your anycast deployment! Consider these enhancements:
+
+- **Add more locations**: Deploy to additional providers/regions
+- **Implement rate limiting**: Protect against abuse
+- **Set up monitoring**: Track latency and availability globally
+- **Document runbooks**: Prepare for incident response
+
+<LinkCard
+  title="Troubleshooting Guide"
+  description="Common issues and solutions for anycast deployments."
+  href="/reference/troubleshooting"
+/>
+
+<LinkCard
+  title="Health Checks Guide"
+  description="Advanced health checking strategies and tools."
+  href="/guides/health-checks"
+/>
+
+## Related Documentation
+
+<LinkCard
+  title="Start Over: Overview"
+  description="Return to the example overview."
+  href="/example/overview"
+/>

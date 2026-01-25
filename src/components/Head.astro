@@ -1,0 +1,16 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro'
+---
+
+<Default />
+
+<script>
+    import mermaid from 'mermaid';
+    mermaid.initialize({startOnLoad: true})
+    mermaid.registerIconPacks([
+        {
+            name: 'carbon',
+            loader: () => import('@iconify-json/carbon').then((module) => module.icons),
+        },
+    ]);
+</script>

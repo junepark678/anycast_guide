@@ -1,0 +1,304 @@
+---
+title: "Step 5: DNS Anycast"
+description: "Deploy a DNS server on your anycast network using BIND. Configure authoritative DNS with automatic failover across multiple locations."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+With your BGP infrastructure in place, let's deploy a DNS server that leverages your anycast network. We'll use BIND as our authoritative DNS server.
+
+## Why DNS + Anycast?
+
+DNS is one of the most common use cases for anycast because:
+
+- **Low latency**: Users automatically connect to the nearest server
+- **High availability**: If one node fails, traffic routes to the next closest
+- **DDoS resilience**: Attack traffic is distributed across all nodes
+- **UDP-friendly**: DNS primarily uses UDP, which works naturally with anycast
+
+<Aside>
+Anycast is ideal for stateless or short-lived protocols like DNS. Long-lived TCP connections may experience issues if routing changes mid-connection.
+</Aside>
+
+## Installing BIND
+
+<Tabs>
+  <TabItem label="Debian/Ubuntu">
+```bash
+# Install BIND9
+sudo apt update
+sudo apt install bind9 bind9utils bind9-doc
+
+# Verify installation
+named -v
+```
+  </TabItem>
+  <TabItem label="RHEL/Rocky">
+```bash
+# Install BIND
+sudo dnf install bind bind-utils
+
+# Verify installation
+named -v
+```
+  </TabItem>
+</Tabs>
+
+## Configuring BIND for Anycast
+
+### Main Configuration
+
+Edit `/etc/bind/named.conf.options`:
+
+```conf
+// /etc/bind/named.conf.options
+
+options {
+    directory "/var/cache/bind";
+
+    // Listen on the anycast address
+    listen-on { 
+        127.0.0.1;
+        203.0.113.1;  // Your anycast IPv4
+    };
+    
+    listen-on-v6 { 
+        ::1;
+        2001:db8:abcd::1;  // Your anycast IPv6
+    };
+
+    // Disable recursion - authoritative only
+    recursion no;
+    
+    // Hide version
+    version "not disclosed";
+    
+    // Improve performance
+    minimal-responses yes;
+    
+    // Allow queries from anywhere
+    allow-query { any; };
+    
+    // Disable zone transfers (or restrict to secondaries)
+    allow-transfer { none; };
+};
+```
+
+### Zone Configuration
+
+Create your zone file at `/etc/bind/named.conf.local`:
+
+```conf
+// /etc/bind/named.conf.local
+
+zone "example.com" {
+    type master;
+    file "/etc/bind/zones/db.example.com";
+    allow-query { any; };
+};
+
+// Reverse zone for your anycast prefix (optional)
+zone "113.0.203.in-addr.arpa" {
+    type master;
+    file "/etc/bind/zones/db.203.0.113";
+};
+```
+
+### Zone Data
+
+Create the zone file `/etc/bind/zones/db.example.com`:
+
+```bash
+# Create zones directory
+sudo mkdir -p /etc/bind/zones
+```
+
+```dns
+; /etc/bind/zones/db.example.com
+$TTL    300
+$ORIGIN example.com.
+
+@       IN      SOA     ns1.example.com. admin.example.com. (
+                        2024011501      ; Serial (YYYYMMDDNN)
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        300             ; Negative Cache TTL
+)
+
+; Nameservers - pointing to your anycast addresses
+@       IN      NS      ns1.example.com.
+@       IN      NS      ns2.example.com.
+
+; Glue records - same anycast IP for all NS
+ns1     IN      A       203.0.113.1
+ns1     IN      AAAA    2001:db8:abcd::1
+ns2     IN      A       203.0.113.1
+ns2     IN      AAAA    2001:db8:abcd::1
+
+; Your domain records
+@       IN      A       203.0.113.10
+@       IN      AAAA    2001:db8:abcd::10
+www     IN      A       203.0.113.10
+www     IN      AAAA    2001:db8:abcd::10
+```
+
+<Aside type="tip">
+Using the same anycast IP for multiple NS records is intentional. Each NS name resolves to the anycast address, which routes to the nearest server. This provides redundancy through anycast rather than multiple unicast IPs.
+</Aside>
+
+## Starting BIND
+
+<Steps>
+1. **Check configuration syntax**
+   ```bash
+   sudo named-checkconf
+   sudo named-checkzone example.com /etc/bind/zones/db.example.com
+   ```
+
+2. **Enable and start BIND**
+   ```bash
+   sudo systemctl enable named
+   sudo systemctl start named
+   ```
+
+3. **Verify BIND is listening on anycast IP**
+   ```bash
+   sudo ss -ulnp | grep named
+   # Should show 203.0.113.1:53
+   ```
+
+4. **Test DNS resolution**
+   ```bash
+   # Query the local server
+   dig @203.0.113.1 example.com
+   
+   # Query the anycast IPv6
+   dig @2001:db8:abcd::1 example.com AAAA
+   ```
+</Steps>
+
+## Zone Synchronization
+
+For anycast DNS, all nodes must serve identical zone data. Options for synchronization:
+
+### Option 1: Zone Transfers (AXFR/IXFR)
+
+Configure one node as primary, others as secondaries:
+
+```conf
+// On primary server
+zone "example.com" {
+    type master;
+    file "/etc/bind/zones/db.example.com";
+    allow-transfer { 192.0.2.20; 192.0.2.30; };  // Secondary IPs
+    notify yes;
+};
+
+// On secondary servers  
+zone "example.com" {
+    type slave;
+    file "/var/cache/bind/db.example.com";
+    masters { 192.0.2.10; };  // Primary IP
+};
+```
+
+### Option 2: Configuration Management
+
+Use tools like Ansible, Puppet, or rsync to push zone files to all nodes:
+
+```bash
+# Example: rsync zone files to all nodes
+for node in node1 node2 node3; do
+    rsync -avz /etc/bind/zones/ ${node}:/etc/bind/zones/
+    ssh ${node} "sudo rndc reload"
+done
+```
+
+### Option 3: Git-based Deployment
+
+Store zone files in git and deploy via CI/CD:
+
+```bash
+# Pull latest zones and reload
+cd /etc/bind/zones
+git pull origin main
+sudo rndc reload
+```
+
+<Aside>
+For critical DNS infrastructure, consider using zone transfers with TSIG authentication for security and reliability.
+</Aside>
+
+## Registrar Configuration
+
+Update your domain registrar to use your anycast nameservers:
+
+<Steps>
+1. **Add glue records at registrar**
+   
+   Set the glue (IP addresses) for your nameservers:
+   - ns1.example.com → 203.0.113.1
+   - ns2.example.com → 203.0.113.1
+
+2. **Set nameservers for domain**
+   
+   Configure the domain to use:
+   - ns1.example.com
+   - ns2.example.com
+
+3. **Wait for propagation**
+   
+   DNS changes can take 24-48 hours to fully propagate
+</Steps>
+
+## Testing Your Anycast DNS
+
+### Local Testing
+
+```bash
+# Query your anycast DNS directly
+dig @203.0.113.1 example.com +short
+
+# Check authoritative response
+dig @203.0.113.1 example.com SOA +norecurse
+```
+
+### Global Testing
+
+Test from different locations to verify anycast routing:
+
+```bash
+# Use online DNS checkers
+# - https://www.whatsmydns.net/
+# - https://dnschecker.org/
+
+# Or use RIPE Atlas probes
+ripe-atlas measure dns --query-argument example.com --query-type A --target 203.0.113.1
+```
+
+## Verification Checklist
+
+- [ ] BIND listening on anycast IP (both IPv4 and IPv6)
+- [ ] DNS queries return correct responses
+- [ ] All anycast nodes return identical zone data
+- [ ] Glue records configured at registrar
+- [ ] Domain using your anycast nameservers
+
+## Next Step
+
+To ensure high availability, we need to implement health checks that withdraw BGP announcements when DNS becomes unhealthy.
+
+<LinkCard
+  title="Step 6: Health Checks"
+  description="Implement automated failover with health monitoring."
+  href="/example/step-6"
+/>
+
+## Related Documentation
+
+<LinkCard
+  title="DNS Anycast Guide"
+  description="Comprehensive guide to DNS anycast deployment."
+  href="/guides/dns-anycast"
+/>

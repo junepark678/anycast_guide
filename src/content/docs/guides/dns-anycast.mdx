@@ -1,0 +1,322 @@
+---
+title: "Anycast DNS Setup | Run Your Own DNS Servers"
+description: "Deploy anycast DNS servers for improved performance and reliability. Learn DNS server options, architecture patterns, and BGP integration for failover."
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps, Card, CardGrid } from '@astrojs/starlight/components';
+
+DNS is one of the most common use cases for anycast networking. By deploying DNS servers across multiple locations with the same IP address, you can reduce latency for users worldwide and provide automatic failover if a server becomes unavailable.
+
+{/* TODO: Brief intro about why DNS + anycast is a natural fit */}
+
+## Why Anycast DNS?
+
+Anycast provides several benefits for DNS infrastructure:
+
+- **Reduced latency**: Users connect to the nearest DNS server automatically
+- **Improved reliability**: Server failures are handled by BGP rerouting
+- **DDoS resilience**: Attack traffic is distributed across all nodes
+- **Simple client configuration**: Single IP address for all locations
+
+{/* TODO: Expand on each benefit with real-world examples */}
+
+<Aside>
+Most major public DNS providers (Cloudflare 1.1.1.1, Google 8.8.8.8, Quad9) use anycast. You're building the same architecture at a smaller scale.
+</Aside>
+
+## DNS Server Options
+
+Several DNS server implementations work well for anycast deployments:
+
+### Authoritative DNS Servers
+
+{/* TODO: Expand on each option with pros/cons */}
+
+| Server | Best For | Notes |
+|--------|----------|-------|
+| **Knot DNS** | High performance authoritative | Modern, fast, good for large zones |
+| **PowerDNS** | Flexibility, database backends | Supports many backends, good API |
+| **BIND 9** | Familiarity, full-featured | Most widely deployed, mature |
+| **NSD** | Simplicity, performance | Lightweight, authoritative-only |
+
+### Recursive DNS Servers
+
+| Server | Best For | Notes |
+|--------|----------|-------|
+| **Unbound** | Security, performance | Popular choice for recursive |
+| **Knot Resolver** | Flexibility, scripting | Lua scripting support |
+| **BIND 9** | Combined auth/recursive | Can serve both roles |
+
+<Aside type="note">
+This guide focuses on authoritative DNS. Running open recursive resolvers requires additional security considerations to prevent abuse.
+</Aside>
+
+## Basic Anycast DNS Architecture
+
+A typical anycast DNS deployment consists of:
+
+```
+                    ┌─────────────────┐
+                    │   DNS Clients   │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │    Internet     │
+                    └────────┬────────┘
+                             │
+           ┌─────────────────┼─────────────────┐
+           │                 │                 │
+    ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
+    │   Node 1    │   │   Node 2    │   │   Node 3    │
+    │  (US-West)  │   │  (US-East)  │   │  (Europe)   │
+    │ 203.0.113.1 │   │ 203.0.113.1 │   │ 203.0.113.1 │
+    └─────────────┘   └─────────────┘   └─────────────┘
+```
+
+Each node runs:
+- DNS server (Knot, PowerDNS, BIND, etc.)
+- BGP daemon (BIRD or FRR)
+- Health check system
+
+{/* TODO: Expand on architecture, zone synchronization considerations */}
+
+## Configuring Your DNS Server
+
+<Tabs>
+  <TabItem label="Knot DNS">
+    ```yaml
+    # /etc/knot/knot.conf
+    
+    server:
+        listen: 203.0.113.1@53
+        listen: 203.0.113.1@53 [udp]
+    
+    log:
+      - target: syslog
+        any: info
+    
+    database:
+        storage: /var/lib/knot
+    
+    zone:
+      - domain: example.com
+        file: /etc/knot/zones/example.com.zone
+        
+      - domain: example.net
+        file: /etc/knot/zones/example.net.zone
+    ```
+
+    {/* TODO: More Knot configuration details */}
+  </TabItem>
+  <TabItem label="PowerDNS">
+    ```conf
+    # /etc/powerdns/pdns.conf
+    
+    # Listen on anycast IP
+    local-address=203.0.113.1
+    local-port=53
+    
+    # Backend configuration
+    launch=bind
+    bind-config=/etc/powerdns/named.conf
+    
+    # Performance tuning
+    receiver-threads=2
+    distributor-threads=4
+    ```
+
+    {/* TODO: More PowerDNS configuration details */}
+  </TabItem>
+  <TabItem label="BIND 9">
+    ```conf
+    // /etc/bind/named.conf.options
+    
+    options {
+        directory "/var/cache/bind";
+        
+        // Listen on anycast IP
+        listen-on { 203.0.113.1; };
+        listen-on-v6 { 2001:db8::1; };
+        
+        // Disable recursion for authoritative-only
+        recursion no;
+        
+        // DNSSEC validation
+        dnssec-validation auto;
+    };
+    
+    // Zone configuration
+    zone "example.com" {
+        type master;
+        file "/etc/bind/zones/example.com.zone";
+    };
+    ```
+
+    {/* TODO: More BIND configuration details */}
+  </TabItem>
+</Tabs>
+
+### Loopback Interface Configuration
+
+Configure your anycast IP on the loopback interface:
+
+```bash
+# /etc/network/interfaces.d/anycast
+
+auto lo:1
+iface lo:1 inet static
+    address 203.0.113.1
+    netmask 255.255.255.255
+```
+
+{/* TODO: systemd-networkd alternative, IPv6 configuration */}
+
+## Integrating with BGP
+
+The key to anycast DNS failover is integrating your DNS server health with BGP announcements. When the DNS server is healthy, announce the prefix; when it fails, withdraw the announcement.
+
+{/* TODO: Detailed explanation of the integration pattern */}
+
+### Basic Health Check Script
+
+```bash
+#!/bin/bash
+# /usr/local/bin/dns-healthcheck.sh
+
+ANYCAST_IP="203.0.113.1"
+TEST_DOMAIN="health.example.com"
+EXPECTED_RESPONSE="healthy"
+
+# Query local DNS server
+response=$(dig +short +time=2 +tries=1 @${ANYCAST_IP} ${TEST_DOMAIN} TXT 2>/dev/null | tr -d '"')
+
+if [ "$response" = "$EXPECTED_RESPONSE" ]; then
+    exit 0  # Healthy
+else
+    exit 1  # Unhealthy
+fi
+```
+
+{/* TODO: More sophisticated health check examples */}
+
+<Tabs>
+  <TabItem label="BIRD Integration">
+    ```conf
+    # Use BFD or script-based protocol
+    protocol static anycast_dns {
+        ipv4;
+        route 203.0.113.0/24 blackhole;
+        # Route added/removed by external health check script
+    }
+    ```
+    
+    Control script:
+    ```bash
+    # Enable route
+    birdc enable anycast_dns
+    
+    # Disable route
+    birdc disable anycast_dns
+    ```
+  </TabItem>
+  <TabItem label="FRR Integration">
+    ```conf
+    ! Static route controlled by health check
+    ip route 203.0.113.0/24 Null0
+    
+    router bgp 65001
+     address-family ipv4 unicast
+      network 203.0.113.0/24
+     exit-address-family
+    !
+    ```
+    
+    Control via route manipulation or BGP neighbor shutdown.
+  </TabItem>
+</Tabs>
+
+<Aside type="tip">
+See the [Health Checks guide](/guides/health-checks) for detailed implementation patterns.
+</Aside>
+
+## Testing and Validation
+
+<Steps>
+1. **Test DNS resolution locally**
+   ```bash
+   dig @203.0.113.1 example.com A
+   dig @203.0.113.1 example.com AAAA
+   ```
+
+2. **Verify from external locations**
+   
+   Use online DNS testing tools or VPN to different regions.
+
+3. **Test failover behavior**
+   
+   Stop DNS server and verify BGP route is withdrawn.
+
+4. **Check query distribution**
+   
+   Monitor logs across all nodes to verify traffic distribution.
+</Steps>
+
+{/* TODO: Expand testing procedures, tools to use */}
+
+## Monitoring DNS Performance
+
+Key metrics to monitor for anycast DNS:
+
+- **Query rate**: Queries per second per node
+- **Response latency**: Time to respond to queries
+- **Error rate**: SERVFAIL, REFUSED, timeouts
+- **Geographic distribution**: Which nodes serve which regions
+
+{/* TODO: Monitoring tool recommendations, example dashboards */}
+
+### Prometheus Metrics Example
+
+```yaml
+# prometheus.yml scrape config for PowerDNS
+scrape_configs:
+  - job_name: 'pdns'
+    static_configs:
+      - targets: ['localhost:8081']
+```
+
+{/* TODO: More monitoring examples */}
+
+<Aside type="caution">
+Monitor all nodes from external locations, not just locally. A node might appear healthy locally but be unreachable from parts of the internet.
+</Aside>
+
+## Zone Synchronization
+
+With multiple DNS nodes, you need to keep zone data synchronized:
+
+{/* TODO: Expand on each synchronization method */}
+
+- **AXFR/IXFR**: Traditional DNS zone transfers
+- **Git-based**: Store zones in git, deploy with CI/CD
+- **Database replication**: For PowerDNS with database backend
+- **Configuration management**: Ansible, Puppet, etc.
+
+## Next Steps
+
+<LinkCard
+  title="BGP Health Checks"
+  description="Implement robust health checks and automated failover."
+  href="/guides/health-checks"
+/>
+
+<LinkCard
+  title="BIRD Setup Guide"
+  description="Configure BIRD for your anycast DNS deployment."
+  href="/guides/bird-setup"
+/>
+
+<LinkCard
+  title="FRRouting Setup Guide"
+  description="Configure FRR for your anycast DNS deployment."
+  href="/guides/frr-setup"
+/>

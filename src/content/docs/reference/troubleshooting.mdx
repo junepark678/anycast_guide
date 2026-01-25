@@ -1,0 +1,478 @@
+---
+title: "Anycast Troubleshooting | Common Issues & Solutions"
+description: "Debug anycast BGP problems with this troubleshooting guide. Solutions for session failures, route filtering, RPKI issues, and health check problems."
+---
+
+import { Aside, Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+When your anycast setup isn't working as expected, systematic debugging is essential. This guide covers common issues and diagnostic approaches for anycast BGP deployments.
+
+{/* TODO: Add brief troubleshooting philosophy/approach */}
+
+## Diagnostic Tools
+
+### BGP-Specific Tools
+
+<Tabs>
+  <TabItem label="BIRD">
+```bash
+# Enter BIRD control interface
+birdc
+
+# Show protocols and their state
+birdc show protocols
+birdc show protocols all upstream1
+
+# Show BGP session details
+birdc show protocols all <protocol_name>
+
+# Show routes
+birdc show route
+birdc show route for 203.0.113.0/24
+birdc show route where net = 203.0.113.0/24 all
+birdc show route export <protocol_name>
+birdc show route protocol <protocol_name>
+
+# Show filtered routes (routes that would be exported)
+birdc show route export <protocol_name>
+
+# Debug route filtering
+birdc show route where net = 203.0.113.0/24 all
+
+# Configuration check
+birdc configure check
+
+# Reload configuration
+birdc configure
+```
+  </TabItem>
+  <TabItem label="FRR">
+```bash
+# Enter vtysh
+sudo vtysh
+
+# BGP summary
+show bgp summary
+show bgp ipv4 unicast summary
+show bgp ipv6 unicast summary
+
+# BGP neighbor details
+show bgp neighbors
+show bgp neighbors 192.0.2.1
+show bgp neighbors 192.0.2.1 advertised-routes
+show bgp neighbors 192.0.2.1 received-routes
+
+# Route information
+show ip bgp
+show ip bgp 203.0.113.0/24
+show ip bgp 203.0.113.0/24 bestpath
+
+# Route map and filter debugging
+debug bgp updates
+debug bgp filters
+
+# Clear and refresh sessions
+clear bgp ipv4 unicast * soft
+clear bgp ipv4 unicast 192.0.2.1 soft out
+```
+  </TabItem>
+</Tabs>
+
+{/* TODO: Add more diagnostic commands with explanations */}
+
+### Network Diagnostic Tools
+
+```bash
+# Test connectivity to BGP neighbor
+ping 192.0.2.254
+ping -I 192.0.2.1 192.0.2.254  # From specific source
+
+# Check TCP connectivity (BGP uses port 179)
+nc -zv 192.0.2.254 179
+telnet 192.0.2.254 179
+
+# Trace path to destination
+traceroute 192.0.2.254
+mtr -r 192.0.2.254
+
+# Check listening ports
+ss -tlnp | grep 179
+netstat -tlnp | grep bgp
+
+# View routing table
+ip route show
+ip -6 route show
+ip route get 203.0.113.1
+
+# Check interface status
+ip addr show
+ip link show
+```
+
+{/* TODO: Add more network debugging tools */}
+
+### Looking Glasses
+
+Looking glasses allow you to see how your routes appear from external networks.
+
+{/* TODO: Add explanation of what looking glasses show */}
+{/* TODO: Explain how to interpret looking glass results */}
+
+<Aside type="tip">
+Use multiple looking glasses from different geographic locations to verify your anycast routes are propagating correctly worldwide.
+</Aside>
+
+## Common BGP Issues
+
+### Session Not Establishing
+
+When your BGP session stays in Idle, Connect, or Active state instead of reaching Established.
+
+#### Symptoms
+
+<Tabs>
+  <TabItem label="BIRD">
+```bash
+birdc show protocols
+# Shows: upstream1  BGP  ---  start  ...
+# Or:    upstream1  BGP  ---  active ...
+```
+  </TabItem>
+  <TabItem label="FRR">
+```bash
+show bgp summary
+# Shows: Idle, Connect, Active, or OpenSent instead of Established
+```
+  </TabItem>
+</Tabs>
+
+#### Possible Causes and Solutions
+
+**1. TCP connectivity failure**
+
+```bash
+# Test BGP port connectivity
+nc -zv <neighbor_ip> 179
+
+# Check for firewall rules
+iptables -L -n | grep 179
+```
+
+<Aside type="caution">
+Many providers require you to allow both incoming and outgoing TCP port 179 connections.
+</Aside>
+
+{/* TODO: Add firewall configuration examples */}
+
+**2. Incorrect neighbor IP or AS number**
+
+```bash
+# Verify configuration matches provider's instructions
+# Double-check:
+# - Neighbor IP address
+# - Neighbor AS number
+# - Your local AS number
+# - Multihop setting (if required)
+```
+
+**3. MD5 password mismatch**
+
+{/* TODO: Explain MD5 authentication issues */}
+{/* TODO: Add debugging steps for password issues */}
+
+**4. Missing multihop configuration**
+
+```bash
+# If neighbor is not directly connected, multihop is required
+# BIRD:
+multihop 2;
+
+# FRR:
+neighbor 192.0.2.254 ebgp-multihop 2
+```
+
+**5. Source address issues**
+
+{/* TODO: Explain update-source requirements */}
+{/* TODO: Add configuration examples */}
+
+### Routes Not Being Advertised
+
+Your BGP session is established but your anycast prefix isn't being advertised.
+
+#### Diagnosis
+
+<Tabs>
+  <TabItem label="BIRD">
+```bash
+# Check if route exists in BIRD
+birdc show route for 203.0.113.0/24
+
+# Check what's being exported to the peer
+birdc show route export upstream1
+
+# Check export filter results
+birdc show route where net = 203.0.113.0/24 all
+```
+  </TabItem>
+  <TabItem label="FRR">
+```bash
+# Check if network is in BGP
+show ip bgp 203.0.113.0/24
+
+# Check advertised routes to neighbor
+show bgp neighbors 192.0.2.254 advertised-routes
+
+# Verify network statement or redistribution
+show running-config router bgp
+```
+  </TabItem>
+</Tabs>
+
+#### Possible Causes and Solutions
+
+**1. Missing network statement or static route**
+
+```bash
+# FRR: Add network statement
+router bgp 65001
+  address-family ipv4 unicast
+    network 203.0.113.0/24
+
+# BIRD: Ensure static protocol has the route
+protocol static anycast {
+    ipv4;
+    route 203.0.113.0/24 blackhole;
+}
+```
+
+**2. Export filter rejecting the route**
+
+{/* TODO: Add filter debugging steps */}
+{/* TODO: Show how to test filters */}
+
+**3. Route not in correct address family**
+
+<Aside>
+Remember that in FRR, you must activate neighbors in each address family and use the correct `network` statement within the address family.
+</Aside>
+
+### Routes Not Being Accepted
+
+Your route is being advertised but isn't appearing in the global routing table.
+
+#### Diagnosis
+
+```bash
+# Check from a looking glass if the route is visible
+# Use RIPE RIS, RouteViews, or provider-specific looking glass
+
+# Check BGP communities being sent
+birdc show route for 203.0.113.0/24 all
+# or
+show ip bgp 203.0.113.0/24
+```
+
+#### Possible Causes
+
+{/* TODO: Expand each cause with solutions */}
+
+1. **RPKI validation failure** - ROA missing or incorrect
+2. **IRR filtering** - Route object missing from IRR database
+3. **Prefix too small** - Many networks filter prefixes longer than /24
+4. **AS path issues** - AS not in expected position
+
+### Prefix Filtered by Upstream
+
+Your provider is filtering your route announcement.
+
+#### Common Reasons
+
+| Reason | Solution |
+|--------|----------|
+| No RPKI ROA | Create ROA in your RIR's portal |
+| ROA mismatch | Verify ROA covers your prefix and origin AS |
+| No IRR route object | Create route/route6 object in appropriate IRR |
+| Prefix too long | Advertise /24 or shorter for IPv4 |
+| AS not authorized | Check provider's prefix/AS authorization |
+| Community filtering | Verify you're not sending wrong communities |
+
+<Aside type="caution">
+Most providers require both valid RPKI ROA and IRR route objects before accepting your announcements.
+</Aside>
+
+{/* TODO: Add step-by-step verification process */}
+
+## RPKI Validation Failures
+
+RPKI (Resource Public Key Infrastructure) validation failures prevent your route from being accepted.
+
+### Checking RPKI Status
+
+```bash
+# Check your ROA status using external tools
+# Visit: https://rpki-validator.ripe.net/
+# Or: https://bgp.tools/prefix/203.0.113.0/24
+```
+
+{/* TODO: Add more RPKI debugging steps */}
+{/* TODO: Explain ROA creation process */}
+
+### Common RPKI Issues
+
+1. **No ROA exists**
+   - Create ROA in your RIR's portal (ARIN, RIPE, APNIC, etc.)
+
+2. **ROA has wrong origin AS**
+   - Update ROA to specify your correct AS number
+
+3. **ROA has wrong max length**
+   - Ensure max length covers your announced prefix length
+
+4. **ROA propagation delay**
+   - Wait up to 24 hours for ROA to propagate to all validators
+
+<Aside type="tip">
+Create ROAs with maxLength equal to your prefix length (e.g., /24 for a /24 announcement) unless you specifically need to allow more-specific announcements.
+</Aside>
+
+## Health Check Problems
+
+When your health checks fail, routes may be withdrawn unexpectedly.
+
+### Debugging Health Checks
+
+```bash
+# Check health check service status
+systemctl status anycast-healthcheck
+
+# View health check logs
+journalctl -u anycast-healthcheck -f
+
+# Test health check manually
+curl -v http://localhost/health
+```
+
+{/* TODO: Add health check debugging steps */}
+{/* TODO: Cover common health check failure scenarios */}
+
+### Common Issues
+
+- **Service not running** - Restart the monitored service
+- **Wrong health check endpoint** - Verify URL and port
+- **Timeout too aggressive** - Increase timeout threshold
+- **Flapping** - Add dampening or increase check interval
+
+<Tabs>
+  <TabItem label="BIRD">
+```bash
+# Check if protocol is enabled/disabled
+birdc show protocols anycast
+
+# Manually enable/disable for testing
+birdc enable anycast
+birdc disable anycast
+```
+  </TabItem>
+  <TabItem label="FRR">
+```bash
+# Check static route status
+show ip route 203.0.113.0/24
+
+# Check track object (if using)
+show track
+```
+  </TabItem>
+</Tabs>
+
+## Provider-Specific Issues
+
+### Vultr
+
+{/* TODO: Add Vultr-specific troubleshooting */}
+
+- BGP sessions use neighbor `169.254.169.254`
+- Requires multihop 2
+- Must enable BGP in Vultr portal first
+- Check BGP status in Vultr portal
+
+### Other Providers
+
+{/* TODO: Add provider-specific sections as needed */}
+{/* TODO: Cover common provider quirks */}
+
+## Useful Looking Glass Sites
+
+Looking glasses let you verify how your routes appear from different networks and locations.
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| RIPE RIS | lg.ring.nlnog.net | Multi-location looking glass |
+| RouteViews | www.routeviews.org | Academic routing data |
+| Hurricane Electric | lg.he.net | Global BGP looking glass |
+| bgp.tools | bgp.tools | Modern BGP toolkit |
+| NLNOG RING | lg.ring.nlnog.net | Operator community looking glass |
+
+{/* TODO: Add more looking glass resources */}
+{/* TODO: Explain how to interpret results */}
+
+### Using Looking Glasses
+
+```
+# Typical looking glass queries:
+# - show ip bgp <your_prefix>
+# - show bgp path to <your_prefix>
+# - traceroute to <your_anycast_ip>
+```
+
+<Aside type="tip">
+Test from multiple geographic locations to verify your anycast is working correctly. Routes should appear with different AS paths from different vantage points.
+</Aside>
+
+## Getting Help
+
+### Communities and Resources
+
+When you need additional help, these communities can provide assistance:
+
+{/* TODO: Add community links and resources */}
+
+- **NANOG** - North American Network Operators' Group
+- **PeeringDB** - Peering coordination database
+- **Your provider's support** - Start here for provider-specific issues
+- **Network operator IRC channels** - #bgp on Libera.Chat
+
+### Information to Gather Before Asking
+
+When seeking help, provide:
+
+1. Your AS number and prefix
+2. Provider/upstream details
+3. Relevant configuration (sanitized)
+4. Output of diagnostic commands
+5. Looking glass results
+6. Timeline of when issue started
+
+<Aside>
+Always sanitize configurations before sharing - remove passwords and any sensitive information.
+</Aside>
+
+## Related Resources
+
+<CardGrid>
+  <LinkCard
+    title="BGP Attributes Reference"
+    href="/reference/bgp-attributes/"
+    description="Understanding BGP path attributes"
+  />
+  <LinkCard
+    title="BIRD Configuration Reference"
+    href="/reference/bird-config/"
+    description="BIRD syntax and configuration options"
+  />
+  <LinkCard
+    title="FRR Configuration Reference"
+    href="/reference/frr-config/"
+    description="FRRouting commands and syntax"
+  />
+</CardGrid>

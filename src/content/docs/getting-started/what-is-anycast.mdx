@@ -1,0 +1,100 @@
+---
+title: What is Anycast? | How Anycast Routing Works
+description: Learn what anycast routing is and how it works. Understand the difference between anycast and unicast, common use cases, and why DIY anycast is achievable for hobbyists.
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+Anycast is a network addressing and routing methodology where a single IP address is announced from multiple locations simultaneously. When a user connects to an anycast address, they're automatically routed to the nearest (or best) instance based on BGP routing metrics.
+
+{/* TODO: Add an introductory paragraph with a real-world analogy to make anycast intuitive for beginners */}
+
+## How Anycast Works
+
+At its core, anycast leverages the Border Gateway Protocol (BGP) to announce the same IP prefix from multiple points of presence (PoPs) around the world. The internet's routing infrastructure naturally directs traffic to the topologically closest announcement.
+
+{/* TODO: Detailed explanation of BGP announcements and path selection */}
+
+### The Role of BGP
+
+BGP is the protocol that makes anycast possible. Each of your servers announces the same IP prefix to their upstream providers, and the global routing table propagates these announcements.
+
+{/* TODO: Explain BGP path selection, AS path length, and how traffic finds the "nearest" server */}
+
+### Traffic Flow in Anycast
+
+When a client sends a packet to your anycast IP, their ISP's routers consult the BGP routing table and forward the packet along the shortest AS path.
+
+{/* TODO: Step-by-step walkthrough of a packet's journey in an anycast network */}
+
+## Anycast vs Unicast
+
+Understanding the difference between anycast and unicast is fundamental to grasping why anycast is powerful for certain applications.
+
+{/* TODO: Comparison table showing unicast vs anycast characteristics */}
+
+### When Unicast Makes Sense
+
+Unicast remains the right choice for stateful, long-lived connections where session persistence matters.
+
+{/* TODO: Examples of unicast-appropriate applications */}
+
+### When Anycast Excels
+
+Anycast shines for stateless protocols and services where automatic failover and geographic distribution are priorities.
+
+{/* TODO: Examples of anycast-appropriate applications */}
+
+## Common Use Cases
+
+Anycast powers some of the most critical infrastructure on the internet. Here's where it's commonly deployed:
+
+### DNS Services
+
+DNS is the most common anycast use case. Major DNS providers like Cloudflare (1.1.1.1) and Google (8.8.8.8) use anycast to serve billions of queries daily from hundreds of locations.
+
+{/* TODO: Explain why DNS is ideal for anycast (UDP, stateless, latency-sensitive) */}
+
+### Content Delivery Networks (CDNs)
+
+CDNs use anycast to route users to the nearest edge server, reducing latency and improving download speeds.
+
+{/* TODO: Explain CDN anycast architecture and TCP anycast considerations */}
+
+### DDoS Mitigation
+
+Anycast provides natural DDoS resilience by distributing attack traffic across multiple locations, preventing any single point from being overwhelmed.
+
+{/* TODO: Explain how anycast absorbs and disperses volumetric attacks */}
+
+## Benefits of DIY Anycast
+
+Building your own anycast network is more accessible than ever. Here's why hobbyists and small organizations are taking control of their network infrastructure:
+
+### Cost Efficiency
+
+With sponsorship programs and affordable colocation, running a small anycast network can cost less than premium managed services.
+
+{/* TODO: Rough cost breakdown and comparison with managed alternatives */}
+
+### Learning Opportunity
+
+There's no better way to understand internet routing than building and operating your own anycast network.
+
+{/* TODO: Skills gained and career benefits */}
+
+### Full Control
+
+Own your IP space, control your routing policy, and never worry about vendor lock-in.
+
+{/* TODO: Expand on independence and flexibility benefits */}
+
+## Next Steps
+
+Now that you understand what anycast is and why it's valuable, let's look at what you'll need to build your own anycast network.
+
+<LinkCard
+  title="Prerequisites for DIY Anycast"
+  description="Review the technical requirements, costs, and knowledge needed before starting your anycast project."
+  href="/getting-started/prerequisites/"
+/>

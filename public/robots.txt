@@ -1,0 +1,6 @@
+# robots.txt for anycast.guide
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://anycast.guide/sitemap-index.xml
