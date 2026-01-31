@@ -26,25 +26,27 @@ Understanding the difference between anycast and unicast is fundamental to grasp
 <Tabs>
   <TabItem label="Unicast">
     Unicast is the traditional method of network communication where a single unique IP address corresponds to a single device. When you connect to a unicast address, your traffic is routed to that specific device, regardless of its location.
+    
+    **Pros**:
+    - Direct, persistent connections
+    - Easier to manage stateful sessions
+    - Easier data consistency
+    **Cons**:
+    - No inherent redundancy
+    - Potentially higher latency if the device is far away
   </TabItem>
   <TabItem label="Anycast">
-    Anycast, on the other hand, allows multiple devices to share the same IP address.
+    Anycast, on the other hand, allows multiple devices to share the same IP address. When you connect to an anycast address, your traffic is routed to the nearest device advertising that address, based on BGP routing decisions.
+
+    **Pros**:
+    - Built-in redundancy and failover
+    - Reduced latency by connecting to the nearest server
+    - Scalability through distributed architecture
+    **Cons**:
+    - Not suitable for stateful connections
+    - Complexity in managing distributed systems
   </TabItem>
 </Tabs>
-
-{/* TODO: Comparison table showing unicast vs anycast characteristics */}
-
-### When Unicast Makes Sense
-
-Unicast remains the right choice for stateful, long-lived connections where session persistence matters.
-
-{/* TODO: Examples of unicast-appropriate applications */}
-
-### When Anycast Excels
-
-Anycast shines for stateless protocols and services where automatic failover and geographic distribution are priorities.
-
-{/* TODO: Examples of anycast-appropriate applications */}
 
 ## Common Use Cases
 
@@ -52,43 +54,32 @@ Anycast powers some of the most critical infrastructure on the internet. Here's 
 
 ### DNS Services
 
-DNS is the most common anycast use case. Major DNS providers like Cloudflare (1.1.1.1) and Google (8.8.8.8) use anycast to serve billions of queries daily from hundreds of locations.
-
-{/* TODO: Explain why DNS is ideal for anycast (UDP, stateless, latency-sensitive) */}
+DNS is the most common anycast use case. Major DNS providers like Cloudflare (1.1.1.1) and Google (8.8.8.8) use anycast to serve billions of queries daily from hundreds of locations. DNS is a stateless UDP service, making it ideal for anycast deployment.
 
 ### Content Delivery Networks (CDNs)
 
 CDNs use anycast to route users to the nearest edge server, reducing latency and improving download speeds.
 
+CDNs don't need to constantly maintain consistent state between edge nodes, making anycast a perfect fit. Distributed caching and replication strategies ensure content availability across all nodes.
 {/* TODO: Explain CDN anycast architecture and TCP anycast considerations */}
 
 ### DDoS Mitigation
 
 Anycast provides natural DDoS resilience by distributing attack traffic across multiple locations, preventing any single point from being overwhelmed.
-
-{/* TODO: Explain how anycast absorbs and disperses volumetric attacks */}
+Anycast allows traffic to be absorbed and dispersed across a wide network of servers, making it harder for attackers to target a single location effectively.
 
 ## Benefits of DIY Anycast
 
 Building your own anycast network is more accessible than ever. Here's why hobbyists and small organizations are taking control of their network infrastructure:
 
-### Cost Efficiency
-
-With sponsorship programs and affordable colocation, running a small anycast network can cost less than premium managed services.
-
-{/* TODO: Rough cost breakdown and comparison with managed alternatives */}
-
 ### Learning Opportunity
 
 There's no better way to understand internet routing than building and operating your own anycast network.
-
-{/* TODO: Skills gained and career benefits */}
+You will gain hands-on experience with BGP, network architecture, and distributed systems.
 
 ### Full Control
 
-Own your IP space, control your routing policy, and never worry about vendor lock-in.
-
-{/* TODO: Expand on independence and flexibility benefits */}
+Own your IP space, control your routing policy, and never worry about vendor lock-in. DIY anycast allows you to tailor your network to your specific needs and preferences.
 
 ## Next Steps
 

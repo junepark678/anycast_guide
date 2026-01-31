@@ -20,14 +20,59 @@ A two-node setup provides basic redundancy and geographic distribution:
 ```mermaid
 architecture-beta
     group region1(carbon:location)[Region 1]
-    service server(carbon:router)[Router] in region1
+    
+    service server1(carbon:router)[Router] in region1
+    service app1(server)[Anycast Node] in region1
+    
+    group region2(carbon:location)[Region 2]
+    
+    service server2(carbon:router)[Router] in region2
+    service app2(server)[Anycast Node] in region2
+    
+    service internet(carbon:cloud)[Internet]
 
+    junction junction1
+    junction junction2
 
+    app1:R -- L:server1
+    app2:R -- L:server2
+    server1:R -- L:junction1
+    server2:R -- L:junction2
+    junction1:T -- B:internet
+    junction2:B -- T:internet
 ```
 
-{/* TODO: Diagram description and explanation of minimal topology */}
+This topology includes two anycast nodes in separate regions, each connected to their local router, which in turn connects to the internet.
 
-{/* TODO: Explain what happens during node failure and traffic redistribution */}
+
+If a node goes offline, BGP will automatically reroute traffic to the remaining node, providing basic failover capability.
+
+```mermaid
+architecture-beta
+    group region1(carbon:location)[Region 1]
+    
+    service server1(carbon:router)[Router] in region1
+    service app1(server)[Anycast Node] in region1
+    
+    group region2(carbon:location)[Region 2]
+    
+    service server2(carbon:router)[Router] in region2
+    service app2(server)[Anycast Node] in region2
+
+    service internet(carbon:cloud)[Internet]
+
+    %% junction junction1
+    %% junction junction2
+
+    app1:R -- L:server1
+    app2:R -- L:server2
+    server1:R -- L:internet
+    %% server2:R -- L:junction2
+    %% junction1:T -- B:internet
+    %% junction2:B -- T:internet
+```
+
+Traffic destined for the anycast prefix will now be routed solely to the remaining active node.
 
 <Aside type="tip">
   Start with two nodes in different regions to validate your configuration before expanding. This approach minimizes complexity while proving your setup works.
@@ -37,13 +82,18 @@ architecture-beta
 
 Every anycast node requires these components:
 
-{/* TODO: List and explain: BGP daemon, service software, health checks, monitoring */}
+- **BGP Daemon**: Software like BIRD or FRR to handle BGP announcements and sessions.
+- **Service Software**: The application or service you're anycasting (e.g., DNS server).
+- **Health Checks**: Mechanisms to monitor service health and withdraw BGP announcements if a node fails.
+- **Monitoring**: Tools to track BGP propagation, latency, and overall network health.
 
 ### Health Checking and Failover
 
 Automatic failover requires health checks that withdraw BGP announcements when services fail:
 
-{/* TODO: Explain health check mechanisms and BGP withdrawal strategies */}
+- **Local Health Checks**: Monitor the service locally (e.g., DNS query success) and trigger BGP withdrawal if unhealthy.
+- **BGP Withdrawal**: Configure your BGP daemon to withdraw the prefix when health checks fail.
+- **Out-of-Band Monitoring**: Use external monitoring services to alert you of node failures.
 
 ## Multi-Region Deployment
 
@@ -53,13 +103,16 @@ Scaling beyond two nodes requires careful planning to ensure optimal traffic dis
 
 Choosing node locations involves balancing coverage, cost, and connectivity:
 
-{/* TODO: Discuss placement considerations: user distribution, IXP availability, transit costs */}
+- **User Distribution**: Place nodes near your user base to minimize latency.
+- **IXP Presence**: Deploy at Internet Exchange Points (IXPs) for better peering opportunities.
+- **Transit Costs**: Consider the cost of transit in different regions; some areas may have higher fees.
 
 ### Regional Considerations
 
 Different regions have unique characteristics affecting anycast performance:
 
-{/* TODO: Cover regional differences in peering, transit costs, and routing behavior */}
+- **Network Topology**: Understand the local internet topology to optimize routing.
+- **Peering Policies**: Research common peering arrangements in each region. Generally, peering is more common in North America and Europe than in other areas.
 
 <Aside type="note">
   Traffic doesn't always route to the geographically closest node. BGP path selection considers AS path length and routing policy, which may differ from physical distance.
@@ -67,9 +120,12 @@ Different regions have unique characteristics affecting anycast performance:
 
 ### Scaling Patterns
 
-Common approaches for growing your anycast network:
+A big pro of anycast is its ease of horizontal scaling. Compared to unicast, you can directly add more nodes to improve capacity and coverage, unlike with unicast, where you often need to upgrade existing infrastructure.
 
-{/* TODO: Discuss horizontal scaling, regional hub models, and tier considerations */}
+Common scaling patterns include:
+- **Flat Model**: All nodes are equal peers announcing the same prefix. Simple but can lead to suboptimal routing in large deployments.
+- **Regional Hubs**: Group nodes into regional clusters, each announcing a sub-prefix.
+- **Tiered Architecture**: Use a combination of global and regional anycast prefixes to optimize routing and load distribution.
 
 ## DNS Anycast Architecture
 
@@ -79,7 +135,11 @@ DNS is the most common anycast application. Here's how to architect DNS-specific
 
 Running your own authoritative DNS servers with anycast:
 
-{/* TODO: Explain authoritative DNS anycast topology, zone synchronization, and consistency considerations */}
+Authoritative DNS servers respond to queries for domains they manage. Anycast improves performance and resilience by distributing these servers globally. The zonefile should be synchronized across all nodes to ensure consistency. A common way to achieve this is by using IXFR/AXFR transfers or configuration management tools. When using IXFR/AXFR, ensure you properly set up TSIG so an unwanted adversary does not update your zones. IXFR is defined in RFC 1995 and AXFR in RFC 5936.
+
+<Aside type="caution">
+  Ensure all authoritative DNS nodes have identical zone data to prevent inconsistent responses. Use secure zone transfer methods to synchronize data.
+</Aside>
 
 ### Recursive DNS Anycast
 

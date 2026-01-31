@@ -86,6 +86,13 @@ export default defineConfig({
 						{ label: 'Step 6: Health Checks', slug: 'example/step-6' },
 					],
 				},
+				{
+					label: 'Appendix',
+					items: [
+						{ label: 'Glossary', slug: 'appendix/glossary' },
+						{ label: 'RIR Policy Comparison', slug: 'appendix/policy-comparison' },
+					],
+				},
 			],
 			components: {
 				Head: './src/components/Head.astro',

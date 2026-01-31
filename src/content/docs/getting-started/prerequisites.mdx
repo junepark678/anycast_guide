@@ -4,10 +4,9 @@ description: Discover the technical requirements for building a DIY anycast netw
 ---
 
 import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 Before diving into anycast configuration, you'll need to gather resources and develop foundational knowledge. This page outlines everything required to build and operate your own anycast network.
-
-{/* TODO: Brief encouraging paragraph about the journey ahead */}
 
 ## Technical Requirements
 
@@ -17,33 +16,77 @@ Building an anycast network requires several key resources. Here's what you'll n
 
 An ASN is your unique identifier in the global BGP routing table. You'll need one to peer with upstream providers and announce your IP prefixes.
 
-{/* TODO: Explain ASN types (16-bit vs 32-bit), how to obtain from RIRs, and sponsorship options */}
-
 <Aside type="tip">
   Many LIRs offer ASN sponsorship programs that can significantly reduce costs for hobbyists. Check the [resources section](/resources/getting-asn/) for recommended sponsors.
 </Aside>
 
 ### IP Address Space
 
-You'll need at least a /48 IPv6 prefix and ideally a /24 IPv4 prefix (the minimum typically accepted for global BGP announcements).
+You'll need at least a /48 IPv6 prefix (the minimum typically accepted for global BGP announcements). IPv4 is out of scope for this guide, but should be simple to implement if you acquire any.
 
-{/* TODO: Explain minimum prefix sizes, provider independent vs provider assigned, and acquisition options */}
+<Aside type="note">
+  Check our [IP acquisition guide](/resources/getting-ip-space/) for tips on obtaining IP space.
+</Aside>
 
 ### Servers in Multiple Locations
 
 Anycast requires presence in multiple geographic locations. You'll need servers or VPS instances capable of running BGP software.
-
-{/* TODO: Discuss colocation options, VPS providers that allow BGP, and minimum recommended locations */}
+For this guide, we will be working with three nodes, but it should be easy to scale to more locations as needed.
 
 <Aside type="caution">
-  Not all VPS providers allow BGP sessions. Verify BGP support before committing to a provider. We maintain a list in our [recommended providers](/resources/providers/) section.
+  Not all VPS providers allow BGP sessions. Verify BGP support before committing to a provider. We maintain a list in our [providers](/resources/providers/) section.
 </Aside>
 
 ### Upstream Connectivity
 
 Each location needs BGP connectivity to the internet, either through direct upstream providers or internet exchange points (IXPs).
 
-{/* TODO: Explain transit vs peering, IXP membership, and connectivity options for hobbyists */}
+#### Connectivity Options
+
+<Tabs>
+  <TabItem label="Transit">
+    Transit providers sell you access to the global internet. They will carry your traffic to and from any destination on the internet.
+
+    **Pros**:
+    - Simplicity: One provider handles all routing
+    - Broad reachability
+    - Easier to set up for beginners
+
+    **Cons**:
+    - Higher cost compared to peering
+    - Less control over routing policies
+
+    Transit is typically billed based on bandwidth usage (95th percentile billing is common). Costs can vary widely depending on the provider and location, so it's best to request quotes directly from transit providers.
+  </TabItem>
+  <TabItem label="Peering">
+    Peering involves directly connecting with other networks to exchange traffic without going through a transit provider. This can be done bilaterally or at IXPs.
+
+    **Pros**:
+    - Lower costs by reducing transit fees
+    - Greater control over routing policies
+    - Potentially improved performance with direct paths
+
+    **Cons**:
+    - More complex setup and management
+    - Requires building relationships with other networks
+
+    Peering is generally done bilaterally without additional payment, but some networks may charge fees for peering sessions. Some networks may require you to have a certain traffic volume or network size before agreeing to peer or require a dedicated link. Joining an IXP is a common way to facilitate peering with multiple networks.
+  </TabItem>
+  <TabItem label="IXP Membership">
+    Joining an IXP allows you to peer with multiple networks in a single location. This can be a cost-effective way to gain diverse connectivity.
+
+    **Pros**:
+    - Access to many networks through one connection
+    - Reduced costs compared to multiple transit providers
+    - Improved redundancy and performance
+
+    **Cons**:
+    - Potential membership fees and requirements
+    - Physical presence potentially needed at the IXP location
+
+    Generally, contacting the IXP directly will provide the best information on membership options and costs.
+  </TabItem>
+</Tabs>
 
 ## Understanding BGP Basics
 
@@ -53,13 +96,22 @@ A working knowledge of BGP is essential for operating an anycast network. Here a
 
 Before configuring your first router, familiarize yourself with these fundamentals:
 
-{/* TODO: List and briefly explain: AS path, prefix announcements, BGP communities, route filtering, peering vs transit */}
+- **BGP Sessions**: How to establish and maintain BGP peering with upstream providers.
+- **AS_PATH**: Understanding how routes are propagated and selected based on AS path length.
+- **Prefix Announcements**: How to announce your IP prefixes to the internet. These must be at least a /48 for IPv6.
+- **BGP Communities**: Using communities to tag and manage routes. These are formatted as `<ASN>:<value>`. Generally, your upstreams will provide specific community values for actions like route filtering, prepending, or blackholing. Check their docs for details.
+- **Route Filtering**: Implementing prefix filters to prevent route leaks and hijacks. Some common filters include IRR-based filters and RPKI validation.
+- **Peering vs Transit**: Peering involves direct exchange of traffic between networks, while transit providers carry your traffic to and from the broader internet.
 
 ### Route Filtering and Security
 
 Responsible anycast operation requires proper route filtering to prevent leaks and hijacks.
 
-{/* TODO: Explain IRR, RPKI, prefix filters, and why they matter */}
+<LinkCard
+  title="IRR and RPKI"
+  description="Learn more about IRR and RPKI for securing your BGP announcements."
+  href="/resources/irr-rpki"
+/>
 
 <Aside type="danger">
   Misconfigured BGP can disrupt internet routing beyond your network. Always implement proper filters and test configurations carefully before announcing prefixes globally.
@@ -69,33 +121,22 @@ Responsible anycast operation requires proper route filtering to prevent leaks a
 
 You'll need to monitor your announcements and troubleshoot routing issues:
 
-{/* TODO: Introduce looking glasses, RIPE RIS, BGP tools, and monitoring approaches */}
+#### Looking Glasses and BGP.Tools
+
+A **Looking Glass** is a web-based tool provided by many networks that allows you to view their BGP routing tables and test reachability to your prefixes. This is invaluable for verifying that your announcements are propagating correctly.
+
+[**BGP.Tools**](https://bgp.tools/) is another useful resource that provides various BGP-related tools, including prefix propagation checks and AS path analysis. They also provide live updates for new upstreams and loss of announcements.
+
+**RIPE RIS** (Routing Information Service) is a project that collects and stores BGP routing data from multiple vantage points around the world. You can use RIPE RIS to analyze how your prefixes are being propagated and to monitor for any anomalies. Contrary to the name, RIPE RIS is not limited to European networks; it provides global coverage across all RIRs.
 
 ## Cost Considerations
 
 Running a DIY anycast network involves several cost categories. Here's a realistic breakdown:
 
-### Initial Setup Costs
-
-One-time expenses to get your network operational:
-
-{/* TODO: Breakdown of ASN fees, IP allocation fees, initial hardware/VPS costs */}
-
-### Ongoing Monthly Costs
-
-Recurring expenses to maintain your network:
-
-{/* TODO: Breakdown of hosting, transit/peering fees, RIR membership if applicable */}
-
-### Budget Options
-
-Anycast doesn't have to break the bank. Here are ways to minimize costs:
-
-{/* TODO: Discuss sponsorship programs, free IXP ports, budget VPS providers with BGP support */}
-
-<Aside type="note">
-  Many hobbyists run functional anycast networks for under $100/month across multiple locations. Cost optimization strategies are covered in our [budget guide](/guides/budget-anycast/).
-</Aside>
+**ASN acquisition and IP space allocation fees:**
+- ASN: $55~$100 for RIPE NCC sponsorships, varies by LIR
+- IP Space: Varies widely; some LIRs offer free /48 IPv6 allocations with ASN sponsorship, most allow you to buy blocks separately, so you aren't tied to the LIR who sponsored your ASN. PI in RIPE NCC is around $100 per year (depending on LIR) for a /48 IPv6 block.
+- POPs will have initial setup fees depending on the provider. These vary widely based on location and provider.
 
 ## Time Investment
 
@@ -103,27 +144,21 @@ Be realistic about the time required to build and operate an anycast network:
 
 ### Initial Learning Curve
 
-If you're new to BGP, expect to spend time learning before configuring:
-
-{/* TODO: Estimated hours for learning BGP basics, recommended resources and tutorials */}
-
-### Setup Time
-
-Once you have resources and knowledge, deployment takes time:
-
-{/* TODO: Estimated timeline from ASN acquisition to first announcement */}
+If you're new to BGP, expect to spend time learning before configuring. This guide aims to be beginner-friendly, but basic Linux CLI and networking knowledge is assumed.
 
 ### Ongoing Maintenance
 
-Running an anycast network is an ongoing commitment:
-
-{/* TODO: Discuss monitoring, updates, incident response, and realistic time expectations */}
+Running an anycast network is an ongoing commitment, however, tools such as BGP.Tools and other monitoring services can help reduce the maintenance burden.
 
 ## Knowledge Checkpoints
 
 Before proceeding, ensure you can answer these questions:
 
-{/* TODO: List of self-assessment questions covering BGP basics, resource requirements, and realistic expectations */}
+- How do I get the contents of a file on the Linux CLI?
+- What is BGP and why is it important for anycast?
+- What is an ASN and how do I acquire one?
+- What is IP address space and what size do I need for anycast?
+- What are the differences between transit and peering?
 
 ## Next Steps
 

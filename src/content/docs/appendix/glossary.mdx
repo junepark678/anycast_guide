@@ -1,0 +1,162 @@
+---
+title: "Glossary"
+description: "Definitions of key terms and concepts used throughout the anycast guide, including BGP, routing, and network infrastructure terminology."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A reference of terminology used throughout this guide.
+
+## A
+
+### Anycast
+A network addressing method where a single IP address is announced from multiple locations simultaneously. Traffic is routed to the topologically nearest instance based on BGP routing decisions.
+
+### AS (Autonomous System)
+A collection of IP networks and routers under the control of a single organization that presents a common routing policy to the internet.
+
+### ASN (Autonomous System Number)
+A unique identifier assigned to an autonomous system. ASNs are used in BGP to identify networks and track routing paths. Can range from AS1 to AS4294967295. 
+
+### AS_PATH
+A BGP attribute that lists all autonomous systems a route has traversed. Used for loop prevention and path selection—shorter AS_PATH is generally preferred.
+
+### AS_PATH Prepending
+A technique to artificially lengthen the AS_PATH by adding your own ASN multiple times, making a route less preferred to influence inbound traffic flow.
+
+### AS-SET
+An IRR object that groups multiple ASNs together. Used to define routing policies that apply to collections of networks.
+
+## B
+
+### BGP (Border Gateway Protocol)
+The routing protocol used to exchange routing information between autonomous systems on the internet. BGP is the protocol that makes anycast possible by allowing the same prefix to be announced from multiple locations.
+
+### BIRD
+A popular open-source routing daemon that implements BGP, OSPF, and other routing protocols. Commonly used for anycast deployments on Linux systems.
+
+### Blackhole
+A network destination where traffic is silently discarded. Often used for DDoS mitigation by routing attack traffic to a null route.
+
+### Blackhole Community
+A BGP community (typically 65535:666 or provider-specific) that signals upstream networks to drop traffic destined for the tagged prefix.
+
+## C
+
+### CDN (Content Delivery Network)
+A distributed network of servers that delivers content to users from geographically nearby locations. CDNs commonly use anycast for routing.
+
+### Community (BGP Community)
+A 32-bit tag attached to BGP routes that enables flexible routing policies. Communities can signal actions like route filtering, prepending, or blackholing.
+
+## D
+
+### DDoS (Distributed Denial of Service)
+An attack that overwhelms a target with traffic from multiple sources. Anycast provides natural DDoS resilience by distributing attack traffic across multiple locations.
+
+## E
+
+### eBGP (External BGP)
+BGP sessions between routers in different autonomous systems. This is how networks exchange routing information across organizational boundaries.
+
+## F
+
+### FRRouting (FRR)
+An open-source routing protocol suite forked from Quagga. Supports BGP, OSPF, IS-IS, and other protocols. An alternative to BIRD for anycast deployments.
+
+## I
+
+### iBGP (Internal BGP)
+BGP sessions between routers within the same autonomous system. Used to distribute external routing information internally.
+
+### IGP (Interior Gateway Protocol)
+Routing protocols used within a single autonomous system, such as OSPF or IS-IS. Contrasted with BGP, which is an exterior gateway protocol.
+
+### IRR (Internet Routing Registry)
+A distributed database system where network operators publish routing intentions. Providers use IRR data to validate BGP announcements.
+
+## L
+
+### Large Community
+An extended BGP community format (RFC 8092) using 96 bits instead of 32, providing more flexibility for tagging routes with metadata.
+
+### LIR (Local Internet Registry)
+An organization that receives IP address allocations from a Regional Internet Registry (RIR) and assigns them to end users or customers.
+
+### LOCAL_PREF (Local Preference)
+A BGP attribute used within an AS to prefer certain routes. Higher values are preferred. Only exchanged between iBGP peers.
+
+### LOA (Letter of Authorization)
+A document from the IP address holder authorizing another party to announce their prefixes via BGP. Required by most providers before accepting BGP sessions.
+
+## M
+
+### MED (Multi-Exit Discriminator)
+A BGP attribute that suggests to external peers which entry point to prefer when multiple paths exist. Lower values are preferred.
+
+### Multihoming
+Connecting a network to multiple upstream providers for redundancy and improved connectivity.
+
+## N
+
+### NEXT_HOP
+A BGP attribute specifying the IP address to use as the next hop to reach destinations in a BGP UPDATE message.
+
+## O
+
+### ORIGIN
+A BGP attribute indicating how a route was introduced into BGP (IGP, EGP, or INCOMPLETE).
+
+## P
+
+### PA (Provider Aggregatable)
+IP address space assigned by a provider to a customer. The provider retains authority over the addresses, and they typically cannot be announced independently.
+
+### PI (Provider Independent)
+IP address space assigned directly to an organization, not tied to any specific provider. PI space can be announced from any upstream.
+
+### PoP (Point of Presence)
+A physical location where network equipment is deployed. In anycast, each PoP announces the same IP prefix.
+
+### Prefix
+A block of IP addresses expressed in CIDR notation (e.g., 192.0.2.0/24 or 2001:db8::/32). In anycast, the same prefix is announced from multiple locations.
+
+## R
+
+### RADB (Routing Assets Database)
+A widely-used Internet Routing Registry operated by Merit Network. Accepts route objects for resources from multiple RIRs.
+
+### RIR (Regional Internet Registry)
+An organization that manages IP address allocation for a specific region. The five RIRs are ARIN (North America), RIPE NCC (Europe/Middle East), APNIC (Asia Pacific), LACNIC (Latin America), and AFRINIC (Africa).
+
+### ROA (Route Origin Authorization)
+An RPKI object that cryptographically authorizes an ASN to announce specific IP prefixes. Used to validate BGP announcements.
+
+### Route Object
+An IRR database entry that declares which ASN is authorized to originate a specific prefix.
+
+### RPKI (Resource Public Key Infrastructure)
+A cryptographic system that provides verifiable proof of route origin authorization using digital certificates.
+
+## S
+
+### Stateless
+A service design where each request is independent and doesn't rely on stored session data. Stateless protocols like DNS work well with anycast because requests can be handled by any server.
+
+## T
+
+### Transit Provider
+A network that provides connectivity to other parts of the internet. Transit providers carry traffic between networks that don't have direct peering relationships.
+
+## U
+
+### Unicast
+The traditional network addressing method where a single IP address corresponds to a single destination. Contrasted with anycast, where one IP maps to multiple destinations.
+
+### Upstream
+A network provider that connects you to the rest of the internet. Your upstream carries your BGP announcements to other networks.
+
+## V
+
+### VPS (Virtual Private Server)
+A virtual machine sold as a service by hosting providers. Commonly used as anycast nodes due to low cost and geographic distribution.
