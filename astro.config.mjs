@@ -20,6 +20,17 @@ export default defineConfig({
 		sitemap(),
 		starlight({
 			title: 'anycast.guide',
+			description: 'DIY anycast networking: learn BGP, health checks, and operations patterns.',
+			editLink: {
+				baseUrl: 'https://github.com/junepark678/anycast_guide/edit/main/',
+			},
+			social: [
+				{
+					icon: 'github',
+					label: 'GitHub',
+					href: 'https://github.com/junepark678/anycast_guide',
+				},
+			],
 			customCss: ['./src/styles/custom.css'],
 			expressiveCode: {
 				shiki: {
@@ -58,7 +69,7 @@ export default defineConfig({
 				{
 					label: 'Guides',
 					items: [
-						{ label: 'BIRD 2.x Setup', slug: 'guides/bird-setup' },
+						{ label: 'BIRD Setup', slug: 'guides/bird-setup' },
 						{ label: 'FRRouting Setup', slug: 'guides/frr-setup' },
 						{ label: 'Provider Setup', slug: 'guides/provider-setup' },
 						{ label: 'DNS Anycast', slug: 'guides/dns-anycast' },
@@ -74,18 +85,18 @@ export default defineConfig({
 						{ label: 'Troubleshooting', slug: 'reference/troubleshooting' },
 					],
 				},
-				{
-					label: 'Step-by-Step Example',
-					items: [
-						{ label: 'Overview', slug: 'example/overview' },
-						{ label: 'Step 1: IPs & ASN', slug: 'example/step-1' },
-						{ label: 'Step 2: IRR & RPKI', slug: 'example/step-2' },
-						{ label: 'Step 3: BGP Setup', slug: 'example/step-3' },
-						{ label: 'Step 4: Provider Setup', slug: 'example/step-4' },
-						{ label: 'Step 5: DNS Anycast', slug: 'example/step-5' },
-						{ label: 'Step 6: Health Checks', slug: 'example/step-6' },
-					],
-				},
+				// {
+				// 	label: 'Step-by-Step Example',
+				// 	items: [
+				// 		{ label: 'Overview', slug: 'example/overview' },
+				// 		{ label: 'Step 1: IPs & ASN', slug: 'example/step-1' },
+				// 		{ label: 'Step 2: IRR & RPKI', slug: 'example/step-2' },
+				// 		{ label: 'Step 3: BGP Setup', slug: 'example/step-3' },
+				// 		{ label: 'Step 4: Provider Setup', slug: 'example/step-4' },
+				// 		{ label: 'Step 5: DNS Anycast', slug: 'example/step-5' },
+				// 		{ label: 'Step 6: Health Checks', slug: 'example/step-6' },
+				// 	],
+				// },
 				{
 					label: 'Appendix',
 					items: [
