@@ -11,29 +11,12 @@ In this first step, we'll walk through acquiring the essential resources needed 
 
 Before deploying anycast, you need two key resources:
 
-1. **IP Address Space** - A prefix (typically /24 for IPv4, /48 for IPv6) that you'll announce from multiple locations
+1. **IP Address Space** - A prefix (at least a /48 for IPv6) that you'll announce from multiple locations
 2. **Autonomous System Number (ASN)** - A unique identifier for your network in BGP
 
 <Aside>
-For this example, we'll assume you're acquiring resources through an LIR (Local Internet Registry) or a provider that can sponsor your resources. Direct RIR membership is also an option but involves higher costs.
+For this example, we'll assume you're acquiring resources through an LIR (Local Internet Registry) or a provider that can sponsor your resources.
 </Aside>
-
-## Choosing Your Path
-
-There are several ways to obtain IP space and an ASN:
-
-| Method | Cost | Complexity | Best For |
-|--------|------|------------|----------|
-| LIR Sponsorship | Low | Low | Hobbyists, small projects |
-| Provider Allocation | Varies | Low | Single-provider deployments |
-| Direct RIR Membership | High | Medium | Organizations with ongoing needs |
-
-## Example: Using an LIR
-
-For our example deployment, we'll use a hypothetical LIR to obtain:
-
-- **ASN**: AS65536
-- **IPv6 Prefix**: 2001:db8:abcd::/48
 
 <Steps>
 1. **Research LIRs**
@@ -42,28 +25,34 @@ For our example deployment, we'll use a hypothetical LIR to obtain:
 4. **Document your resources**
 </Steps>
 
-## Cost Considerations
+<LinkCard
+  title="Acquiring IP Space"
+  description="Detailed guide on obtaining IP addresses for anycast."
+  href="/resources/acquiring-ip-space"
+/>
 
-Typical costs for LIR sponsorship:
-
-- **Initial Setup**: $50-150 one-time
-- **Annual Fees**: $50-200/year for ASN + IP maintenance
-- **IPv4 Space**: May have additional costs due to scarcity
+<LinkCard
+  title="Acquiring an ASN"
+  description="Complete guide to ASN registration and requirements."
+  href="/resources/acquiring-asn"
+/>
 
 <Aside type="tip">
-IPv6 space is generally much easier and cheaper to obtain than IPv4. Consider starting with IPv6-only if budget is a concern.
+This guide will not cover IPv4 setups, as it is similar to IPv6 deployments and out of scope for this guide.
 </Aside>
 
 ## Verification
 
 After receiving your resources, verify them in public databases:
 
+For our example deployment, we'll use the following resources:
+
+- **ASN**: AS65536
+- **IPv6 Prefix**: 2001:db8:abcd::/48
+
 ```bash
 # Check your ASN registration
-whois AS212345
-
-# Check your IPv4 prefix
-whois 203.0.113.0/24
+whois AS65536
 
 # Check your IPv6 prefix  
 whois 2001:db8:abcd::/48
@@ -77,18 +66,4 @@ Once you have your IP space and ASN, you need to register them in the Internet R
   title="Step 2: IRR & RPKI Setup"
   description="Register your routes and enable cryptographic validation."
   href="/example/step-2"
-/>
-
-## Related Documentation
-
-<LinkCard
-  title="Acquiring IP Space"
-  description="Detailed guide on obtaining IP addresses for anycast."
-  href="/resources/acquiring-ip-space"
-/>
-
-<LinkCard
-  title="Acquiring an ASN"
-  description="Complete guide to ASN registration and requirements."
-  href="/resources/acquiring-asn"
 />

@@ -76,7 +76,7 @@ A typical anycast DNS deployment consists of:
     ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
     │   Node 1    │   │   Node 2    │   │   Node 3    │
     │  (US-West)  │   │  (US-East)  │   │  (Europe)   │
-    │ 203.0.113.1 │   │ 203.0.113.1 │   │ 203.0.113.1 │
+    │ 2001:db8::1 │   │ 2001:db8::1 │   │ 2001:db8::1 │
     └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
@@ -95,8 +95,8 @@ Each node runs:
     # /etc/knot/knot.conf
     
     server:
-        listen: 203.0.113.1@53
-        listen: 203.0.113.1@53 [udp]
+        listen: 2001:db8::1@53
+        listen: 2001:db8::1@53 [udp]
     
     log:
       - target: syslog
@@ -120,7 +120,7 @@ Each node runs:
     # /etc/powerdns/pdns.conf
     
     # Listen on anycast IP
-    local-address=203.0.113.1
+    local-address=2001:db8::1
     local-port=53
     
     # Backend configuration
@@ -142,7 +142,6 @@ Each node runs:
         directory "/var/cache/bind";
         
         // Listen on anycast IP
-        listen-on { 203.0.113.1; };
         listen-on-v6 { 2001:db8::1; };
         
         // Disable recursion for authoritative-only
@@ -171,9 +170,9 @@ Configure your anycast IP on the loopback interface:
 # /etc/network/interfaces.d/anycast
 
 auto lo:1
-iface lo:1 inet static
-    address 203.0.113.1
-    netmask 255.255.255.255
+iface lo:1 inet6 static
+    address 2001:db8::1
+    netmask 128
 ```
 
 {/* TODO: systemd-networkd alternative, IPv6 configuration */}
@@ -190,7 +189,7 @@ The key to anycast DNS failover is integrating your DNS server health with BGP a
 #!/bin/bash
 # /usr/local/bin/dns-healthcheck.sh
 
-ANYCAST_IP="203.0.113.1"
+ANYCAST_IP="2001:db8::1"
 TEST_DOMAIN="health.example.com"
 EXPECTED_RESPONSE="healthy"
 
@@ -211,8 +210,8 @@ fi
     ```conf
     # Use BFD or script-based protocol
     protocol static anycast_dns {
-        ipv4;
-        route 203.0.113.0/24 blackhole;
+        ipv6;
+        route 2001:db8::/48 blackhole;
         # Route added/removed by external health check script
     }
     ```
@@ -229,11 +228,11 @@ fi
   <TabItem label="FRR Integration">
     ```conf
     ! Static route controlled by health check
-    ip route 203.0.113.0/24 Null0
+    ipv6 route 2001:db8::/48 Null0
     
     router bgp 65001
-     address-family ipv4 unicast
-      network 203.0.113.0/24
+     address-family ipv6 unicast
+      network 2001:db8::/48
      exit-address-family
     !
     ```
@@ -251,8 +250,7 @@ See the [Health Checks guide](/guides/health-checks) for detailed implementation
 <Steps>
 1. **Test DNS resolution locally**
    ```bash
-   dig @203.0.113.1 example.com A
-   dig @203.0.113.1 example.com AAAA
+   dig @2001:db8::1 example.com AAAA
    ```
 
 2. **Verify from external locations**

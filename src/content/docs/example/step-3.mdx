@@ -25,9 +25,6 @@ Before configuring BIRD, prepare your server:
    
    Add your anycast IPs to the loopback interface:
    ```bash
-   # Add IPv4 anycast address
-   sudo ip addr add 203.0.113.1/32 dev lo
-   
    # Add IPv6 anycast address
    sudo ip addr add 2001:db8:abcd::1/128 dev lo
    ```
@@ -38,7 +35,6 @@ Before configuring BIRD, prepare your server:
    ```
    auto lo
    iface lo inet loopback
-       up ip addr add 203.0.113.1/32 dev lo
        up ip addr add 2001:db8:abcd::1/128 dev lo
    ```
 </Steps>
@@ -53,7 +49,7 @@ Create your BIRD configuration at `/etc/bird/bird.conf`:
 
 ```bird
 # /etc/bird/bird.conf
-# Example Anycast Configuration for AS212345
+# Example Anycast Configuration for AS65536
 
 # ============================================
 # Global Configuration
@@ -74,17 +70,11 @@ graceful restart wait 15;
 # ============================================
 
 define MY_ASN = 212345;
-define MY_IPv4 = 203.0.113.0/24;
 define MY_IPv6 = 2001:db8:abcd::/48;
 
 # ============================================
 # Common Functions
 # ============================================
-
-function is_my_prefix_v4() {
-    if net = MY_IPv4 then return true;
-    return false;
-}
 
 function is_my_prefix_v6() {
     if net = MY_IPv6 then return true;
@@ -102,7 +92,6 @@ protocol device {
 
 # Direct protocol - learn routes from interfaces
 protocol direct {
-    ipv4;
     ipv6;
     interface "lo";
 }
@@ -123,11 +112,6 @@ protocol kernel kernel_v6 {
 }
 
 # Static routes for our anycast prefixes
-protocol static static_anycast_v4 {
-    ipv4;
-    route MY_IPv4 blackhole;
-}
-
 protocol static static_anycast_v6 {
     ipv6;
     route MY_IPv6 blackhole;
@@ -136,21 +120,6 @@ protocol static static_anycast_v6 {
 # ============================================
 # BGP Templates
 # ============================================
-
-template bgp upstream_v4 {
-    local as MY_ASN;
-    hold time 90;
-    keepalive time 30;
-    graceful restart on;
-    
-    ipv4 {
-        import none;
-        export filter {
-            if is_my_prefix_v4() then accept;
-            reject;
-        };
-    };
-}
 
 template bgp upstream_v6 {
     local as MY_ASN;
@@ -173,8 +142,8 @@ template bgp upstream_v6 {
 
 # Provider sessions will be added in Step 4
 # Example placeholder:
-# protocol bgp vultr_v4 from upstream_v4 {
-#     neighbor 169.254.169.254 as 64515;
+# protocol bgp vultr_v6 from upstream_v6 {
+#     neighbor 2001:19f0:ffff::1 as 64515;
 #     password "secret";
 #     multihop 2;
 # }
@@ -186,7 +155,6 @@ template bgp upstream_v6 {
 
 ```bird
 define MY_ASN = 212345;
-define MY_IPv4 = 203.0.113.0/24;
 define MY_IPv6 = 2001:db8:abcd::/48;
 ```
 
@@ -195,9 +163,9 @@ Using variables makes it easy to update prefixes without changing multiple locat
 ### Static Routes
 
 ```bird
-protocol static static_anycast_v4 {
-    ipv4;
-    route MY_IPv4 blackhole;
+protocol static static_anycast_v6 {
+    ipv6;
+    route MY_IPv6 blackhole;
 }
 ```
 
@@ -213,7 +181,7 @@ The blackhole route doesn't affect local traffic. Services bound to the anycast 
 
 ```bird
 export filter {
-    if is_my_prefix_v4() then accept;
+    if is_my_prefix_v6() then accept;
     reject;
 };
 ```
@@ -246,7 +214,6 @@ This filter ensures only your authorized prefixes are announced. Never announce 
    direct1    Direct     ---        up     12:00:00
    kernel_v4  Kernel     master4    up     12:00:00
    kernel_v6  Kernel     master6    up     12:00:00
-   static_anycast_v4 Static master4 up     12:00:00
    static_anycast_v6 Static master6 up     12:00:00
    ```
 

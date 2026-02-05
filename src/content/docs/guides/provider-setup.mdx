@@ -105,11 +105,11 @@ Vultr provides an easy-to-use BGP portal and doesn't require a ticket for setup.
     # Vultr BGP configuration for BIRD
     protocol bgp vultr {
         local as YOUR_ASN;
-        neighbor 169.254.169.254 as 64515;
+        neighbor 2001:19f0:ffff::1 as 64515;
         multihop 2;
         password "your-vultr-bgp-password";
         
-        ipv4 {
+        ipv6 {
             import none;
             export filter {
                 if net = YOUR_PREFIX then accept;
@@ -122,14 +122,14 @@ Vultr provides an easy-to-use BGP portal and doesn't require a ticket for setup.
   <TabItem label="FRR">
     ```conf
     router bgp YOUR_ASN
-     neighbor 169.254.169.254 remote-as 64515
-     neighbor 169.254.169.254 ebgp-multihop 2
-     neighbor 169.254.169.254 password your-vultr-bgp-password
+     neighbor 2001:19f0:ffff::1 remote-as 64515
+     neighbor 2001:19f0:ffff::1 ebgp-multihop 2
+     neighbor 2001:19f0:ffff::1 password your-vultr-bgp-password
      
-     address-family ipv4 unicast
+     address-family ipv6 unicast
       network YOUR_PREFIX
-      neighbor 169.254.169.254 activate
-      neighbor 169.254.169.254 route-map VULTR-EXPORT out
+      neighbor 2001:19f0:ffff::1 activate
+      neighbor 2001:19f0:ffff::1 route-map VULTR-EXPORT out
      exit-address-family
     !
     ```
@@ -168,10 +168,10 @@ BuyVM is known for competitive pricing and good network connectivity. BGP sessio
     # BuyVM BGP configuration for BIRD
     protocol bgp buyvm {
         local as YOUR_ASN;
-        neighbor BUYVM_NEIGHBOR_IP as 53667;
+        neighbor BUYVM_NEIGHBOR_IPv6 as 53667;
         password "your-buyvm-password";
         
-        ipv4 {
+        ipv6 {
             import none;
             export filter {
                 if net = YOUR_PREFIX then accept;
@@ -184,12 +184,12 @@ BuyVM is known for competitive pricing and good network connectivity. BGP sessio
   <TabItem label="FRR">
     ```conf
     router bgp YOUR_ASN
-     neighbor BUYVM_NEIGHBOR_IP remote-as 53667
-     neighbor BUYVM_NEIGHBOR_IP password your-buyvm-password
+     neighbor BUYVM_NEIGHBOR_IPv6 remote-as 53667
+     neighbor BUYVM_NEIGHBOR_IPv6 password your-buyvm-password
      
-     address-family ipv4 unicast
+     address-family ipv6 unicast
       network YOUR_PREFIX
-      neighbor BUYVM_NEIGHBOR_IP activate
+      neighbor BUYVM_NEIGHBOR_IPv6 activate
      exit-address-family
     !
     ```
@@ -228,10 +228,10 @@ Path.net's DDoS protection can be valuable for anycast deployments serving publi
     # Path.net BGP configuration for BIRD
     protocol bgp pathnet {
         local as YOUR_ASN;
-        neighbor PATHNET_NEIGHBOR_IP as PATHNET_ASN;
+        neighbor PATHNET_NEIGHBOR_IPv6 as PATHNET_ASN;
         password "your-pathnet-password";
         
-        ipv4 {
+        ipv6 {
             import none;
             export filter {
                 if net = YOUR_PREFIX then accept;
@@ -244,12 +244,12 @@ Path.net's DDoS protection can be valuable for anycast deployments serving publi
   <TabItem label="FRR">
     ```conf
     router bgp YOUR_ASN
-     neighbor PATHNET_NEIGHBOR_IP remote-as PATHNET_ASN
-     neighbor PATHNET_NEIGHBOR_IP password your-pathnet-password
+     neighbor PATHNET_NEIGHBOR_IPv6 remote-as PATHNET_ASN
+     neighbor PATHNET_NEIGHBOR_IPv6 password your-pathnet-password
      
-     address-family ipv4 unicast
+     address-family ipv6 unicast
       network YOUR_PREFIX
-      neighbor PATHNET_NEIGHBOR_IP activate
+      neighbor PATHNET_NEIGHBOR_IPv6 activate
      exit-address-family
     !
     ```

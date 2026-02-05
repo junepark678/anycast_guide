@@ -25,12 +25,12 @@ The IRR is a distributed database of routing policies. You'll need to create obj
 
 ### Creating IRR Objects
 
-For our example resources (AS212345, 203.0.113.0/24, 2001:db8:abcd::/48):
+For our example resources (AS65536, 2001:db8:abcd::/48):
 
 <Tabs>
   <TabItem label="aut-num Object">
 ```
-aut-num:        AS212345
+aut-num:        AS65536
 as-name:        EXAMPLE-ANYCAST
 descr:          Example Anycast Network
 org:            ORG-EXAMPLE-RIPE
@@ -43,22 +43,11 @@ last-modified:  2024-01-15T12:00:00Z
 source:         RIPE
 ```
   </TabItem>
-  <TabItem label="route Object (IPv4)">
-```
-route:          203.0.113.0/24
-descr:          Example Anycast IPv4
-origin:         AS212345
-mnt-by:         EXAMPLE-MNT
-created:        2024-01-15T12:00:00Z
-last-modified:  2024-01-15T12:00:00Z
-source:         RIPE
-```
-  </TabItem>
   <TabItem label="route6 Object (IPv6)">
 ```
 route6:         2001:db8:abcd::/48
 descr:          Example Anycast IPv6
-origin:         AS212345
+origin:         AS65536
 mnt-by:         EXAMPLE-MNT
 created:        2024-01-15T12:00:00Z
 last-modified:  2024-01-15T12:00:00Z
@@ -80,10 +69,7 @@ source:         RIPE
 
 3. **Verify creation**
    ```bash
-   # Check IPv4 route object
-   whois -h whois.radb.net 203.0.113.0/24
-   
-   # Check IPv6 route object
+   # Check route object
    whois -h whois.radb.net 2001:db8:abcd::/48
    ```
 
@@ -109,16 +95,15 @@ RPKI (Resource Public Key Infrastructure) provides cryptographic verification of
 2. **Create ROAs for your prefixes**
    
    For each prefix, specify:
-   - **Prefix**: The IP range (e.g., 203.0.113.0/24)
+   - **Prefix**: The IP range (e.g., 2001:db8:abcd::/48)
    - **Maximum Length**: Usually same as prefix length for anycast
-   - **Origin ASN**: Your ASN (AS212345)
+   - **Origin ASN**: Your ASN (AS65536)
 
 3. **Example ROA entries**
    
    | Prefix | Max Length | Origin ASN |
    |--------|------------|------------|
-   | 203.0.113.0/24 | /24 | AS212345 |
-   | 2001:db8:abcd::/48 | /48 | AS212345 |
+   | 2001:db8:abcd::/48 | /48 | AS65536 |
 
 4. **Publish ROAs**
    
@@ -135,10 +120,10 @@ After creating ROAs, verify they're published:
 
 ```bash
 # Using RIPE's RPKI validator
-curl -s "https://rpki-validator.ripe.net/api/v1/validity/AS212345/203.0.113.0/24" | jq
+curl -s "https://rpki-validator.ripe.net/api/v1/validity/AS65536/2001:db8:abcd::/48" | jq
 
 # Using Cloudflare's RPKI toolkit
-curl -s "https://rpki.cloudflare.com/api/v1/prefix/203.0.113.0/24" | jq
+curl -s "https://rpki.cloudflare.com/api/v1/prefix/2001:db8:abcd::/48" | jq
 ```
 
 Expected response should show `"state": "valid"` with your ASN as the origin.
@@ -155,7 +140,6 @@ Before proceeding, confirm:
 ```bash
 # Full verification script
 echo "=== IRR Check ==="
-whois -h whois.radb.net 203.0.113.0/24
 whois -h whois.radb.net 2001:db8:abcd::/48
 
 echo "=== RPKI Check ==="

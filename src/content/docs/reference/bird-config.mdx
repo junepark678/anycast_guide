@@ -85,8 +85,8 @@ protocol bgp upstream1 {
     description "Primary upstream provider";
     
     # Basic settings
-    local 192.0.2.1 as 65001;
-    neighbor 192.0.2.254 as 64512;
+    local 2001:db8::1 as 65001;
+    neighbor 2001:db8::254 as 64512;
     
     # Session parameters
     hold time 90;
@@ -96,16 +96,9 @@ protocol bgp upstream1 {
     error wait time 60, 300;
     
     # Capabilities
-    advertise ipv4 multicast off;
     capabilities yes;
     
     # Route handling
-    ipv4 {
-        import filter import_upstream;
-        export filter export_upstream;
-        next hop self;
-    };
-    
     ipv6 {
         import filter import_upstream_v6;
         export filter export_upstream_v6;
@@ -150,22 +143,14 @@ For anycast, you typically configure eBGP sessions with your upstream provider. 
 Define static routes to be distributed via BGP.
 
 ```bird
-protocol static anycast_routes {
-    ipv4;
-    
-    # Anycast prefix - advertise when healthy
-    route 203.0.113.0/24 blackhole;
-    
-    # Or with specific next hop
-    route 203.0.113.0/24 via 192.0.2.1;
-    
-    # Reject route (for filtering)
-    route 10.0.0.0/8 reject;
-}
-
 protocol static anycast_routes_v6 {
     ipv6;
+    
+    # Anycast prefix - advertise when healthy
     route 2001:db8::/48 blackhole;
+    
+    # Or with specific next hop
+    route 2001:db8::/48 via 2001:db8::1;
 }
 ```
 
@@ -221,7 +206,7 @@ Filters control which routes are imported, exported, or modified.
 filter filter_name {
     # Filter body - statements executed for each route
     
-    if net = 203.0.113.0/24 then accept;
+    if net = 2001:db8::/48 then accept;
     if bgp_path ~ [= 64512 * =] then reject;
     
     accept;  # Default action
@@ -229,8 +214,8 @@ filter filter_name {
 
 # Inline filter (for simple cases)
 protocol bgp example {
-    ipv4 {
-        import where net != 0.0.0.0/0;
+    ipv6 {
+        import where net != ::/0;
         export where source = RTS_STATIC;
     };
 }
@@ -258,7 +243,7 @@ filter import_upstream {
 
 filter export_upstream {
     # Only export our anycast prefix
-    if net = 203.0.113.0/24 then {
+    if net = 2001:db8::/48 then {
         # Add communities
         bgp_community.add((65001, 1));
         accept;
@@ -272,19 +257,19 @@ filter export_upstream {
 
 ```bird
 # Define prefix sets
-define my_prefixes = [203.0.113.0/24, 198.51.100.0/24];
+define my_prefixes_v6 = [2001:db8::/48, 2001:db8:1::/48];
 define bogons = [0.0.0.0/8+, 10.0.0.0/8+, 127.0.0.0/8+, 
                  169.254.0.0/16+, 172.16.0.0/12+, 192.168.0.0/16+];
 
 filter example {
     # Exact match
-    if net = 203.0.113.0/24 then accept;
+    if net = 2001:db8::/48 then accept;
     
     # Set membership
-    if net ~ my_prefixes then accept;
+    if net ~ my_prefixes_v6 then accept;
     
-    # Prefix length range: /24 to /28 within 203.0.113.0/24
-    if net ~ [203.0.113.0/24{24,28}] then accept;
+    # Prefix length range: /48 to /64 within 2001:db8::/48
+    if net ~ [2001:db8::/48{48,64}] then accept;
 }
 ```
 
@@ -298,7 +283,7 @@ Reusable code blocks for complex filter logic.
 ```bird
 # Function definition
 function is_own_prefix() {
-    if net ~ [203.0.113.0/24, 2001:db8::/48] then return true;
+    if net ~ [2001:db8::/48] then return true;
     return false;
 }
 
@@ -378,15 +363,15 @@ filter example {
 
 ```bird
 # Dynamic route based on health check
-protocol static anycast {
-    ipv4;
+protocol static anycast_v6 {
+    ipv6;
     # Route controlled by health check script
-    route 203.0.113.0/24 blackhole;
+    route 2001:db8::/48 blackhole;
 }
 
 # Health check script modifies this via birdc:
-# birdc enable anycast
-# birdc disable anycast
+# birdc enable anycast_v6
+# birdc disable anycast_v6
 ```
 
 {/* TODO: Expand on health check integration patterns */}
@@ -396,7 +381,7 @@ protocol static anycast {
 
 ```bird
 filter export_prepend {
-    if net = 203.0.113.0/24 then {
+    if net = 2001:db8::/48 then {
         # Prepend 3 times to make this path less preferred
         bgp_path.prepend(65001);
         bgp_path.prepend(65001);
@@ -436,28 +421,28 @@ protocol device {
 
 # Kernel protocol
 protocol kernel {
-    ipv4 {
+    ipv6 {
         export all;
         import none;
     };
 }
 
 # Our anycast prefix
-protocol static anycast {
-    ipv4;
-    route 203.0.113.0/24 blackhole;
+protocol static anycast_v6 {
+    ipv6;
+    route 2001:db8::/48 blackhole;
 }
 
 # Upstream BGP session
-protocol bgp vultr {
+protocol bgp upstream {
     local as 65001;
-    neighbor 169.254.169.254 as 64515;
+    neighbor 2001:db8:ffff::1 as 64515;
     multihop 2;
     password "bgp-password";
     
-    ipv4 {
+    ipv6 {
         import none;
-        export where net = 203.0.113.0/24;
+        export where net = 2001:db8::/48;
     };
 }
 ```

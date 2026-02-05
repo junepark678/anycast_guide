@@ -35,8 +35,8 @@ birdc show protocols all <protocol_name>
 
 # Show routes
 birdc show route
-birdc show route for 203.0.113.0/24
-birdc show route where net = 203.0.113.0/24 all
+birdc show route for 2001:db8::/48
+birdc show route where net = 2001:db8::/48 all
 birdc show route export <protocol_name>
 birdc show route protocol <protocol_name>
 
@@ -44,7 +44,7 @@ birdc show route protocol <protocol_name>
 birdc show route export <protocol_name>
 
 # Debug route filtering
-birdc show route where net = 203.0.113.0/24 all
+birdc show route where net = 2001:db8::/48 all
 
 # Configuration check
 birdc configure check
@@ -60,27 +60,26 @@ sudo vtysh
 
 # BGP summary
 show bgp summary
-show bgp ipv4 unicast summary
 show bgp ipv6 unicast summary
 
 # BGP neighbor details
 show bgp neighbors
-show bgp neighbors 192.0.2.1
-show bgp neighbors 192.0.2.1 advertised-routes
-show bgp neighbors 192.0.2.1 received-routes
+show bgp neighbors 2001:db8::254
+show bgp neighbors 2001:db8::254 advertised-routes
+show bgp neighbors 2001:db8::254 received-routes
 
 # Route information
-show ip bgp
-show ip bgp 203.0.113.0/24
-show ip bgp 203.0.113.0/24 bestpath
+show bgp ipv6 unicast
+show bgp ipv6 unicast 2001:db8::/48
+show bgp ipv6 unicast 2001:db8::/48 bestpath
 
 # Route map and filter debugging
 debug bgp updates
 debug bgp filters
 
 # Clear and refresh sessions
-clear bgp ipv4 unicast * soft
-clear bgp ipv4 unicast 192.0.2.1 soft out
+clear bgp ipv6 unicast * soft
+clear bgp ipv6 unicast 2001:db8::254 soft out
 ```
   </TabItem>
 </Tabs>
@@ -91,25 +90,24 @@ clear bgp ipv4 unicast 192.0.2.1 soft out
 
 ```bash
 # Test connectivity to BGP neighbor
-ping 192.0.2.254
-ping -I 192.0.2.1 192.0.2.254  # From specific source
+ping6 2001:db8::254
+ping6 -I 2001:db8::1 2001:db8::254  # From specific source
 
 # Check TCP connectivity (BGP uses port 179)
-nc -zv 192.0.2.254 179
-telnet 192.0.2.254 179
+nc -6 -zv 2001:db8::254 179
+telnet 2001:db8::254 179
 
 # Trace path to destination
-traceroute 192.0.2.254
-mtr -r 192.0.2.254
+traceroute6 2001:db8::254
+mtr -6 -r 2001:db8::254
 
 # Check listening ports
 ss -tlnp | grep 179
 netstat -tlnp | grep bgp
 
 # View routing table
-ip route show
 ip -6 route show
-ip route get 203.0.113.1
+ip -6 route get 2001:db8::1
 
 # Check interface status
 ip addr show
@@ -195,7 +193,7 @@ Many providers require you to allow both incoming and outgoing TCP port 179 conn
 multihop 2;
 
 # FRR:
-neighbor 192.0.2.254 ebgp-multihop 2
+neighbor 2001:db8::254 ebgp-multihop 2
 ```
 
 **5. Source address issues**
@@ -213,22 +211,22 @@ Your BGP session is established but your anycast prefix isn't being advertised.
   <TabItem label="BIRD">
 ```bash
 # Check if route exists in BIRD
-birdc show route for 203.0.113.0/24
+birdc show route for 2001:db8::/48
 
 # Check what's being exported to the peer
 birdc show route export upstream1
 
 # Check export filter results
-birdc show route where net = 203.0.113.0/24 all
+birdc show route where net = 2001:db8::/48 all
 ```
   </TabItem>
   <TabItem label="FRR">
 ```bash
 # Check if network is in BGP
-show ip bgp 203.0.113.0/24
+show bgp ipv6 unicast 2001:db8::/48
 
 # Check advertised routes to neighbor
-show bgp neighbors 192.0.2.254 advertised-routes
+show bgp neighbors 2001:db8::254 advertised-routes
 
 # Verify network statement or redistribution
 show running-config router bgp
@@ -243,13 +241,13 @@ show running-config router bgp
 ```bash
 # FRR: Add network statement
 router bgp 65001
-  address-family ipv4 unicast
-    network 203.0.113.0/24
+  address-family ipv6 unicast
+    network 2001:db8::/48
 
 # BIRD: Ensure static protocol has the route
 protocol static anycast {
-    ipv4;
-    route 203.0.113.0/24 blackhole;
+    ipv6;
+    route 2001:db8::/48 blackhole;
 }
 ```
 
@@ -275,9 +273,9 @@ Your route is being advertised but isn't appearing in the global routing table.
 # Use RIPE RIS, RouteViews, or provider-specific looking glass
 
 # Check BGP communities being sent
-birdc show route for 203.0.113.0/24 all
+birdc show route for 2001:db8::/48 all
 # or
-show ip bgp 203.0.113.0/24
+show bgp ipv6 unicast 2001:db8::/48
 ```
 
 #### Possible Causes
@@ -299,8 +297,8 @@ Your provider is filtering your route announcement.
 |--------|----------|
 | No RPKI ROA | Create ROA in your RIR's portal |
 | ROA mismatch | Verify ROA covers your prefix and origin AS |
-| No IRR route object | Create route/route6 object in appropriate IRR |
-| Prefix too long | Advertise /24 or shorter for IPv4 |
+| No IRR route object | Create route6 object in appropriate IRR |
+| Prefix too long | Advertise /48 or shorter for IPv6 |
 | AS not authorized | Check provider's prefix/AS authorization |
 | Community filtering | Verify you're not sending wrong communities |
 
@@ -319,7 +317,7 @@ RPKI (Resource Public Key Infrastructure) validation failures prevent your route
 ```bash
 # Check your ROA status using external tools
 # Visit: https://rpki-validator.ripe.net/
-# Or: https://bgp.tools/prefix/203.0.113.0/24
+# Or: https://bgp.tools/prefix/2001:db8::/48
 ```
 
 {/* TODO: Add more RPKI debugging steps */}
@@ -340,7 +338,7 @@ RPKI (Resource Public Key Infrastructure) validation failures prevent your route
    - Wait up to 24 hours for ROA to propagate to all validators
 
 <Aside type="tip">
-Create ROAs with maxLength equal to your prefix length (e.g., /24 for a /24 announcement) unless you specifically need to allow more-specific announcements.
+Create ROAs with maxLength equal to your prefix length (e.g., /48 for a /48 announcement) unless you specifically need to allow more-specific announcements.
 </Aside>
 
 ## Health Check Problems
@@ -384,7 +382,7 @@ birdc disable anycast
   <TabItem label="FRR">
 ```bash
 # Check static route status
-show ip route 203.0.113.0/24
+show ipv6 route 2001:db8::/48
 
 # Check track object (if using)
 show track
@@ -398,7 +396,7 @@ show track
 
 {/* TODO: Add Vultr-specific troubleshooting */}
 
-- BGP sessions use neighbor `169.254.169.254`
+- BGP sessions use neighbor `2001:19f0:ffff::1`
 - Requires multihop 2
 - Must enable BGP in Vultr portal first
 - Check BGP status in Vultr portal
@@ -427,9 +425,9 @@ Looking glasses let you verify how your routes appear from different networks an
 
 ```
 # Typical looking glass queries:
-# - show ip bgp <your_prefix>
+# - show bgp ipv6 unicast <your_prefix>
 # - show bgp path to <your_prefix>
-# - traceroute to <your_anycast_ip>
+# - traceroute6 to <your_anycast_ip>
 ```
 
 <Aside type="tip">

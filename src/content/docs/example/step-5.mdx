@@ -57,11 +57,6 @@ options {
     directory "/var/cache/bind";
 
     // Listen on the anycast address
-    listen-on { 
-        127.0.0.1;
-        203.0.113.1;  // Your anycast IPv4
-    };
-    
     listen-on-v6 { 
         ::1;
         2001:db8:abcd::1;  // Your anycast IPv6
@@ -96,12 +91,6 @@ zone "example.com" {
     file "/etc/bind/zones/db.example.com";
     allow-query { any; };
 };
-
-// Reverse zone for your anycast prefix (optional)
-zone "113.0.203.in-addr.arpa" {
-    type master;
-    file "/etc/bind/zones/db.203.0.113";
-};
 ```
 
 ### Zone Data
@@ -131,15 +120,11 @@ $ORIGIN example.com.
 @       IN      NS      ns2.example.com.
 
 ; Glue records - same anycast IP for all NS
-ns1     IN      A       203.0.113.1
 ns1     IN      AAAA    2001:db8:abcd::1
-ns2     IN      A       203.0.113.1
 ns2     IN      AAAA    2001:db8:abcd::1
 
 ; Your domain records
-@       IN      A       203.0.113.10
 @       IN      AAAA    2001:db8:abcd::10
-www     IN      A       203.0.113.10
 www     IN      AAAA    2001:db8:abcd::10
 ```
 
@@ -165,14 +150,11 @@ Using the same anycast IP for multiple NS records is intentional. Each NS name r
 3. **Verify BIND is listening on anycast IP**
    ```bash
    sudo ss -ulnp | grep named
-   # Should show 203.0.113.1:53
+   # Should show [::1]:53 and [2001:db8:abcd::1]:53
    ```
 
 4. **Test DNS resolution**
    ```bash
-   # Query the local server
-   dig @203.0.113.1 example.com
-   
    # Query the anycast IPv6
    dig @2001:db8:abcd::1 example.com AAAA
    ```
@@ -191,7 +173,7 @@ Configure one node as primary, others as secondaries:
 zone "example.com" {
     type master;
     file "/etc/bind/zones/db.example.com";
-    allow-transfer { 192.0.2.20; 192.0.2.30; };  // Secondary IPs
+    allow-transfer { 2001:db8:abcd::20; 2001:db8:abcd::30; };  // Secondary IPs
     notify yes;
 };
 
@@ -199,7 +181,7 @@ zone "example.com" {
 zone "example.com" {
     type slave;
     file "/var/cache/bind/db.example.com";
-    masters { 192.0.2.10; };  // Primary IP
+    masters { 2001:db8:abcd::10; };  // Primary IP
 };
 ```
 
@@ -238,8 +220,8 @@ Update your domain registrar to use your anycast nameservers:
 1. **Add glue records at registrar**
    
    Set the glue (IP addresses) for your nameservers:
-   - ns1.example.com → 203.0.113.1
-   - ns2.example.com → 203.0.113.1
+   - ns1.example.com → 2001:db8:abcd::1
+   - ns2.example.com → 2001:db8:abcd::1
 
 2. **Set nameservers for domain**
    
@@ -258,10 +240,10 @@ Update your domain registrar to use your anycast nameservers:
 
 ```bash
 # Query your anycast DNS directly
-dig @203.0.113.1 example.com +short
+dig @2001:db8:abcd::1 example.com AAAA +short
 
 # Check authoritative response
-dig @203.0.113.1 example.com SOA +norecurse
+dig @2001:db8:abcd::1 example.com SOA +norecurse
 ```
 
 ### Global Testing
@@ -274,12 +256,12 @@ Test from different locations to verify anycast routing:
 # - https://dnschecker.org/
 
 # Or use RIPE Atlas probes
-ripe-atlas measure dns --query-argument example.com --query-type A --target 203.0.113.1
+ripe-atlas measure dns --query-argument example.com --query-type AAAA --target 2001:db8:abcd::1
 ```
 
 ## Verification Checklist
 
-- [ ] BIND listening on anycast IP (both IPv4 and IPv6)
+- [ ] BIND listening on anycast IPv6
 - [ ] DNS queries return correct responses
 - [ ] All anycast nodes return identical zone data
 - [ ] Glue records configured at registrar

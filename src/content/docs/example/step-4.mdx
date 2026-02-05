@@ -41,13 +41,12 @@ For anycast, you'll want providers that:
    
    Once approved, configure:
    - Your ASN: `212345`
-   - IPv4 Prefix: `203.0.113.0/24`
    - IPv6 Prefix: `2001:db8:abcd::/48`
 
 3. **Get BGP session details**
    
    Vultr provides:
-   - Neighbor IP (typically `169.254.169.254`)
+   - Neighbor IP (typically `2001:19f0:ffff::1` for IPv6)
    - Vultr's ASN (`64515` or `20473`)
    - BGP password
    - Multihop value
@@ -73,26 +72,11 @@ Add the following BGP sessions to your BIRD config:
 # ============================================
 
 define VULTR_ASN = 64515;
-define VULTR_NEIGHBOR = 169.254.169.254;
-
-# Vultr IPv4 BGP Session
-protocol bgp vultr_v4 from upstream_v4 {
-    neighbor VULTR_NEIGHBOR as VULTR_ASN;
-    password "your-vultr-bgp-password";
-    multihop 2;
-    
-    ipv4 {
-        import none;
-        export filter {
-            if is_my_prefix_v4() then accept;
-            reject;
-        };
-    };
-}
+define VULTR_NEIGHBOR_V6 = 2001:19f0:ffff::1;
 
 # Vultr IPv6 BGP Session
 protocol bgp vultr_v6 from upstream_v6 {
-    neighbor VULTR_NEIGHBOR as VULTR_ASN;
+    neighbor VULTR_NEIGHBOR_V6 as VULTR_ASN;
     password "your-vultr-bgp-password";
     multihop 2;
     
@@ -115,7 +99,7 @@ Here's the full BIRD configuration with Vultr sessions:
 
 ```bird
 # /etc/bird/bird.conf
-# Complete Anycast Configuration for AS212345 with Vultr
+# Complete Anycast Configuration for AS65536 with Vultr
 
 router id 192.0.2.10;  # Change per server
 
@@ -125,17 +109,11 @@ graceful restart wait 15;
 
 # Variables
 define MY_ASN = 212345;
-define MY_IPv4 = 203.0.113.0/24;
 define MY_IPv6 = 2001:db8:abcd::/48;
 define VULTR_ASN = 64515;
-define VULTR_NEIGHBOR = 169.254.169.254;
+define VULTR_NEIGHBOR_V6 = 2001:19f0:ffff::1;
 
 # Functions
-function is_my_prefix_v4() {
-    if net = MY_IPv4 then return true;
-    return false;
-}
-
 function is_my_prefix_v6() {
     if net = MY_IPv6 then return true;
     return false;
@@ -145,7 +123,6 @@ function is_my_prefix_v6() {
 protocol device { scan time 10; }
 
 protocol direct {
-    ipv4;
     ipv6;
     interface "lo";
 }
@@ -159,24 +136,12 @@ protocol kernel kernel_v6 {
 }
 
 # Static anycast routes
-protocol static static_anycast_v4 {
-    ipv4;
-    route MY_IPv4 blackhole;
-}
-
 protocol static static_anycast_v6 {
     ipv6;
     route MY_IPv6 blackhole;
 }
 
 # BGP Templates
-template bgp upstream_v4 {
-    local as MY_ASN;
-    hold time 90;
-    keepalive time 30;
-    graceful restart on;
-}
-
 template bgp upstream_v6 {
     local as MY_ASN;
     hold time 90;
@@ -185,22 +150,8 @@ template bgp upstream_v6 {
 }
 
 # Vultr BGP Sessions
-protocol bgp vultr_v4 from upstream_v4 {
-    neighbor VULTR_NEIGHBOR as VULTR_ASN;
-    password "your-bgp-password";
-    multihop 2;
-    
-    ipv4 {
-        import none;
-        export filter {
-            if is_my_prefix_v4() then accept;
-            reject;
-        };
-    };
-}
-
 protocol bgp vultr_v6 from upstream_v6 {
-    neighbor VULTR_NEIGHBOR as VULTR_ASN;
+    neighbor VULTR_NEIGHBOR_V6 as VULTR_ASN;
     password "your-bgp-password";
     multihop 2;
     
@@ -231,26 +182,26 @@ protocol bgp vultr_v6 from upstream_v6 {
 
 3. **Check BGP session status**
    ```bash
-   sudo birdc show protocols all vultr_v4
+   sudo birdc show protocols all vultr_v6
    ```
    
    Look for `Established` state:
    ```
-   vultr_v4   BGP        ---        up     12:34:56    Established
+   vultr_v6   BGP        ---        up     12:34:56    Established
      BGP state:          Established
-     Neighbor address:   169.254.169.254
+     Neighbor address:   2001:19f0:ffff::1
      Neighbor AS:        64515
      Local AS:           212345
    ```
 
 4. **Verify route export**
    ```bash
-   sudo birdc show route export vultr_v4
+   sudo birdc show route export vultr_v6
    ```
    
    Should show your prefix:
    ```
-   203.0.113.0/24     blackhole [static_anycast_v4 12:00:00] * (200)
+   2001:db8:abcd::/48     blackhole [static_anycast_v6 12:00:00] * (200)
    ```
 </Steps>
 
@@ -266,7 +217,7 @@ Check that your prefix is visible globally:
 # Hurricane Electric: https://bgp.he.net/
 
 # Or use bgpstream
-bgpstream -p 203.0.113.0/24
+bgpstream -p 2001:db8:abcd::/48
 ```
 
 ### From Your Server
@@ -276,11 +227,10 @@ bgpstream -p 203.0.113.0/24
 sudo birdc show protocols
 
 # Check exported routes
-sudo birdc show route export vultr_v4
 sudo birdc show route export vultr_v6
 
 # Check route details
-sudo birdc show route for 203.0.113.0/24 all
+sudo birdc show route for 2001:db8:abcd::/48 all
 ```
 
 ## Troubleshooting
@@ -289,7 +239,7 @@ sudo birdc show route for 203.0.113.0/24 all
 |---------|----------------|----------|
 | Session stuck in `Active` | Wrong neighbor IP or password | Verify Vultr BGP details |
 | Session stuck in `OpenSent` | Firewall blocking BGP | Allow TCP 179 |
-| Routes not exported | Filter rejecting routes | Check `is_my_prefix_v4()` function |
+| Routes not exported | Filter rejecting routes | Check `is_my_prefix_v6()` function |
 | Prefix not visible globally | Missing IRR/RPKI | Complete Step 2 |
 
 <Aside type="caution">

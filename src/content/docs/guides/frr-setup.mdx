@@ -147,15 +147,15 @@ router bgp 65001
  no bgp default ipv4-unicast
  
  ! Upstream neighbor configuration
- neighbor 169.254.169.254 remote-as 64512
- neighbor 169.254.169.254 password your-bgp-password
- neighbor 169.254.169.254 ebgp-multihop 2
+ neighbor 2001:19f0:ffff::1 remote-as 64512
+ neighbor 2001:19f0:ffff::1 password your-bgp-password
+ neighbor 2001:19f0:ffff::1 ebgp-multihop 2
  
- address-family ipv4 unicast
-  neighbor 169.254.169.254 activate
-  neighbor 169.254.169.254 soft-reconfiguration inbound
-  neighbor 169.254.169.254 route-map EXPORT out
-  neighbor 169.254.169.254 route-map IMPORT in
+ address-family ipv6 unicast
+  neighbor 2001:19f0:ffff::1 activate
+  neighbor 2001:19f0:ffff::1 soft-reconfiguration inbound
+  neighbor 2001:19f0:ffff::1 route-map EXPORT out
+  neighbor 2001:19f0:ffff::1 route-map IMPORT in
  exit-address-family
 !
 ```
@@ -168,11 +168,11 @@ Create static routes and announce them via BGP:
 
 ```conf
 ! Define static routes for your anycast prefixes
-ip route 203.0.113.0/24 Null0
+ipv6 route 2001:db8::/48 Null0
 
 router bgp 65001
- address-family ipv4 unicast
-  network 203.0.113.0/24
+ address-family ipv6 unicast
+  network 2001:db8::/48
  exit-address-family
 !
 ```
@@ -189,11 +189,11 @@ Route maps provide powerful filtering and manipulation capabilities:
 
 ```conf
 ! Prefix list for your anycast prefixes
-ip prefix-list MY-PREFIXES seq 10 permit 203.0.113.0/24
+ipv6 prefix-list MY-PREFIXES seq 10 permit 2001:db8::/48
 
 ! Route map for exports
 route-map EXPORT permit 10
- match ip address prefix-list MY-PREFIXES
+ match ipv6 address prefix-list MY-PREFIXES
 !
 route-map EXPORT deny 20
 !
@@ -204,7 +204,7 @@ route-map IMPORT deny 10
 
 ! Optional: AS path prepending for traffic engineering
 route-map EXPORT-PREPEND permit 10
- match ip address prefix-list MY-PREFIXES
+ match ipv6 address prefix-list MY-PREFIXES
  set as-path prepend 65001 65001
 !
 ```
@@ -221,17 +221,17 @@ route-map EXPORT-PREPEND permit 10
 
 2. **View detailed neighbor information**
    ```bash
-   sudo vtysh -c "show bgp neighbors 169.254.169.254"
+   sudo vtysh -c "show bgp neighbors 2001:19f0:ffff::1"
    ```
 
 3. **Verify advertised routes**
    ```bash
-   sudo vtysh -c "show bgp ipv4 unicast neighbors 169.254.169.254 advertised-routes"
+   sudo vtysh -c "show bgp ipv6 unicast neighbors 2001:19f0:ffff::1 advertised-routes"
    ```
 
 4. **Check routing table**
    ```bash
-   sudo vtysh -c "show ip route"
+   sudo vtysh -c "show ipv6 route"
    ```
 </Steps>
 
@@ -249,16 +249,16 @@ show bgp summary
 show bgp neighbors <ip>
 
 # Show BGP routes
-show bgp ipv4 unicast
+show bgp ipv6 unicast
 
 # Show routes advertised to a neighbor
-show bgp ipv4 unicast neighbors <ip> advertised-routes
+show bgp ipv6 unicast neighbors <ip> advertised-routes
 
 # Show routes received from a neighbor
-show bgp ipv4 unicast neighbors <ip> received-routes
+show bgp ipv6 unicast neighbors <ip> received-routes
 
 # Clear BGP session (soft reset)
-clear bgp ipv4 unicast <ip> soft out
+clear bgp ipv6 unicast <ip> soft out
 
 # Enter configuration mode
 configure terminal

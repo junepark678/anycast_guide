@@ -44,10 +44,10 @@ Create `/usr/local/bin/anycast-healthcheck.sh`:
 set -euo pipefail
 
 # Configuration
-ANYCAST_IP="203.0.113.1"
+ANYCAST_IP="2001:db8:abcd::1"
 CHECK_DOMAIN="example.com"
-EXPECTED_RESULT="203.0.113.10"
-BIRD_PROTOCOL="static_anycast_v4"
+EXPECTED_RESULT="2001:db8:abcd::10"
+BIRD_PROTOCOL="static_anycast_v6"
 STATE_FILE="/var/run/anycast-healthy"
 LOG_TAG="anycast-healthcheck"
 
@@ -60,7 +60,7 @@ log() {
 # Check if DNS is responding correctly
 check_dns() {
     local result
-    result=$(dig +short +time=2 +tries=1 @127.0.0.1 "$CHECK_DOMAIN" A 2>/dev/null || echo "FAILED")
+    result=$(dig +short +time=2 +tries=1 @::1 "$CHECK_DOMAIN" AAAA 2>/dev/null || echo "FAILED")
     
     if [[ "$result" == "$EXPECTED_RESULT" ]]; then
         return 0
@@ -74,7 +74,6 @@ enable_announcement() {
     if [[ ! -f "$STATE_FILE" ]]; then
         log "Enabling BGP announcement - service healthy"
         birdc enable "$BIRD_PROTOCOL" > /dev/null 2>&1 || true
-        birdc enable "static_anycast_v6" > /dev/null 2>&1 || true
         touch "$STATE_FILE"
     fi
 }
@@ -84,7 +83,6 @@ disable_announcement() {
     if [[ -f "$STATE_FILE" ]]; then
         log "Disabling BGP announcement - service unhealthy"
         birdc disable "$BIRD_PROTOCOL" > /dev/null 2>&1 || true
-        birdc disable "static_anycast_v6" > /dev/null 2>&1 || true
         rm -f "$STATE_FILE"
     fi
 }
@@ -164,12 +162,6 @@ Modify your BIRD config to support enabling/disabling protocols:
 
 ```bird
 # Static routes that can be disabled by health checks
-protocol static static_anycast_v4 {
-    ipv4;
-    route 203.0.113.0/24 blackhole;
-    # disabled;  # Uncomment to start disabled
-}
-
 protocol static static_anycast_v6 {
     ipv6;
     route 2001:db8:abcd::/48 blackhole;
@@ -195,17 +187,17 @@ import sys
 def check_dns():
     try:
         result = subprocess.run(
-            ['dig', '+short', '@127.0.0.1', 'example.com'],
+            ['dig', '+short', '@::1', 'example.com', 'AAAA'],
             capture_output=True, text=True, timeout=5
         )
-        return '203.0.113.10' in result.stdout
+        return '2001:db8:abcd::10' in result.stdout
     except:
         return False
 
 if check_dns():
-    print('announce route 203.0.113.0/24 next-hop self')
+    print('announce route 2001:db8:abcd::/48 next-hop self')
 else:
-    print('withdraw route 203.0.113.0/24 next-hop self')
+    print('withdraw route 2001:db8:abcd::/48 next-hop self')
 
 sys.stdout.flush()
 ```
@@ -223,12 +215,12 @@ healthcheck:
   timeout: 3
   checks:
     - type: dns
-      host: 127.0.0.1
+      host: ::1
       query: example.com
-      expected: 203.0.113.10
+      expected: 2001:db8:abcd::10
   actions:
-    healthy: "birdc enable static_anycast_v4"
-    unhealthy: "birdc disable static_anycast_v4"
+    healthy: "birdc enable static_anycast_v6"
+    unhealthy: "birdc disable static_anycast_v6"
 ```
   </TabItem>
 </Tabs>
@@ -262,7 +254,7 @@ healthcheck:
    sudo birdc show protocols | grep static_anycast
    # Should show "disabled" or no export
    
-   sudo birdc show route export vultr_v4
+   sudo birdc show route export vultr_v6
    # Should be empty
    ```
 
@@ -271,7 +263,7 @@ healthcheck:
    sudo systemctl start named
    
    # Routes should be re-announced
-   sudo birdc show route export vultr_v4
+   sudo birdc show route export vultr_v6
    ```
 </Steps>
 
@@ -308,10 +300,10 @@ Your anycast deployment is now complete! Final verification:
 
 ```bash
 # From an external location, query your anycast DNS
-dig @203.0.113.1 example.com
+dig @2001:db8:abcd::1 example.com AAAA
 
 # Check which server responded (add TXT record with hostname)
-dig @203.0.113.1 whoami.example.com TXT
+dig @2001:db8:abcd::1 whoami.example.com TXT
 
 # Verify from multiple geographic locations
 # Use RIPE Atlas or online DNS checkers
