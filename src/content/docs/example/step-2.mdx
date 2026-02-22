@@ -80,53 +80,15 @@ source:         RIPE
 
 ## RPKI Setup
 
-RPKI (Resource Public Key Infrastructure) provides cryptographic verification of route origins through ROAs (Route Origin Authorizations).
+RPKI (Resource Public Key Infrastructure) allows you to create ROAs (Route Origin Authorizations) that cryptographically verify your right to announce specific prefixes from your ASN. Generally, you cannot use the RPKI services of the RIR unless you are using only direct allocations/assignments for resources, which is not the case for many users. Therefore, in this guide, we will walk through using Krill, a common open-source RPKI management tool.
 
-### Creating ROAs
+### Installing Krill
 
-<Steps>
-1. **Access your RIR's RPKI portal**
-   
-   Each RIR has an RPKI dashboard:
-   - RIPE: https://my.ripe.net
-   - ARIN: https://account.arin.net
-   - APNIC: https://myapnic.net
+Follow the official Krill installation guide: [Krill Installation](https://krill.docs.nlnetlabs.nl/en/stable/install-and-run.html)
 
-2. **Create ROAs for your prefixes**
-   
-   For each prefix, specify:
-   - **Prefix**: The IP range (e.g., 2001:db8:abcd::/48)
-   - **Maximum Length**: Usually same as prefix length for anycast
-   - **Origin ASN**: Your ASN (AS65536)
+### Configuring Krill
 
-3. **Example ROA entries**
-   
-   | Prefix | Max Length | Origin ASN |
-   |--------|------------|------------|
-   | 2001:db8:abcd::/48 | /48 | AS65536 |
-
-4. **Publish ROAs**
-   
-   Submit and publish your ROAs through the portal
-</Steps>
-
-<Aside type="tip">
-Set the maximum prefix length equal to your announced prefix length. This prevents sub-prefix hijacking while allowing your exact announcements.
-</Aside>
-
-### Verifying RPKI
-
-After creating ROAs, verify they're published:
-
-```bash
-# Using RIPE's RPKI validator
-curl -s "https://rpki-validator.ripe.net/api/v1/validity/AS65536/2001:db8:abcd::/48" | jq
-
-# Using Cloudflare's RPKI toolkit
-curl -s "https://rpki.cloudflare.com/api/v1/prefix/2001:db8:abcd::/48" | jq
-```
-
-Expected response should show `"state": "valid"` with your ASN as the origin.
+Once you installed Krill, you need to receive the resources from your upstream provider or LIR. This part varies depending on the place you received your resources from. If you received it from a LIR, you should contact their support. They will usually ask you to provide your 
 
 ## Verification Checklist
 
@@ -136,15 +98,6 @@ Before proceeding, confirm:
 - [ ] ROAs are published for all prefixes
 - [ ] RPKI validation shows "valid" status
 - [ ] Objects reference the correct origin ASN
-
-```bash
-# Full verification script
-echo "=== IRR Check ==="
-whois -h whois.radb.net 2001:db8:abcd::/48
-
-echo "=== RPKI Check ==="
-# Check with your preferred RPKI validator
-```
 
 ## Common Issues
 
