@@ -8,7 +8,7 @@
     "start": "astro dev",
     "build": "bun run build:lab && astro build",
     "build:guide": "astro build",
-    "build:lab": "bun install --cwd lab --frozen-lockfile && ANYCAST_LAB_NATIVE_MODE=external bun run --cwd lab build && node scripts/sync-lab.mjs",
+    "build:lab": "bun install --cwd lab --frozen-lockfile && ANYCAST_LAB_NATIVE_STATUS_URL=${ANYCAST_LAB_NATIVE_STATUS_URL:-https://axkc26fwhzeb.objectstorage.ap-chuncheon-1.oci.customer-oci.com/n/axkc26fwhzeb/b/anycast_lab/o/anycast-lab/native-v86/channels/stable/status.json} ANYCAST_LAB_NATIVE_MODE=external bun run --cwd lab build && node scripts/sync-lab.mjs",
     "build:lab:existing": "bun run build:lab",
     "build:lab:from-source": "bun install --cwd lab --frozen-lockfile && bun run --cwd lab build:v86-image && ANYCAST_LAB_NATIVE_MODE=local ANYCAST_LAB_REQUIRE_NATIVE=1 bun run --cwd lab build && node scripts/sync-lab.mjs",
     "preview": "astro preview",

@@ -23,9 +23,9 @@ bun run dev:lab
 
 `bun run build` builds the lab UI into `/lab/` and then builds the guide. It
 does not compile Linux: production points at a separately published native
-release channel by setting `ANYCAST_LAB_NATIVE_STATUS_URL` to its HTTPS status
-document. Without that variable, the build succeeds with NATIVE VM explicitly
-unavailable; cached local images are never copied into the hosted site build.
+release channel in OCI Object Storage. `ANYCAST_LAB_NATIVE_STATUS_URL` can
+override that tracked stable-channel URL for another deployment. Cached local
+images are never copied into the hosted site build.
 
 Native images are built, tested, and published by the lab's long-running
 GitHub Actions workflow. Maintainers can reproduce that release path locally
