@@ -21,12 +21,14 @@ bun run dev
 bun run dev:lab
 ```
 
-`bun run build` reproducibly builds the pinned native Linux/v86 image, builds
-the lab into `/lab/`, and then builds the guide. This keeps a clean production
-checkout from silently shipping a SIM-only lab. The image step needs the normal
-Buildroot host toolchain listed in `lab/appliances/v86/README.md`.
+`bun run build` builds the lab UI into `/lab/` and then builds the guide. It
+does not compile Linux: production points at a separately published native
+release channel by setting `ANYCAST_LAB_NATIVE_STATUS_URL` to its HTTPS status
+document. Without that variable, the build succeeds with NATIVE VM explicitly
+unavailable; cached local images are never copied into the hosted site build.
 
-For a fast local packaging pass that reuses an already-built image—or
-explicitly emits SIM-only status when no image exists—run
-`bun run build:lab:existing` followed by `bun run build:guide`. The complete
-release verification remains `bun run --cwd lab verify:full`.
+Native images are built, tested, and published by the lab's long-running
+GitHub Actions workflow. Maintainers can reproduce that release path locally
+with `bun run build:lab:from-source`; it requires the normal Buildroot host
+toolchain listed in `lab/appliances/v86/README.md`. The complete release
+verification remains `bun run --cwd lab verify:full`.
