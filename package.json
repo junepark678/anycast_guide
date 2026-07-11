@@ -4,8 +4,12 @@
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
+    "dev:lab": "bun run --cwd lab dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "bun run build:lab && astro build",
+    "build:guide": "astro build",
+    "build:lab": "bun install --cwd lab --frozen-lockfile && bun run --cwd lab build:v86-image && bun run --cwd lab build && node scripts/sync-lab.mjs",
+    "build:lab:existing": "bun install --cwd lab --frozen-lockfile && bun run --cwd lab build && node scripts/sync-lab.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },

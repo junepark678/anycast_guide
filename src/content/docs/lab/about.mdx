@@ -1,0 +1,83 @@
+---
+title: "Using Anycast Lab | Try BIRD and FRR Locally"
+description: "Build a multi-PoP topology, edit native BIRD and FRR configurations, test failures, and trace packets locally in your browser."
+---
+
+import { Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+# Anycast Lab
+
+Anycast Lab is a local-first network workbench for experimenting alongside the
+guide. Build routers, clients, services, and links; edit the same BIRD and FRR
+configuration files you would deploy; vary delay and packet loss; fail links;
+and inspect routing decisions with packet traces.
+
+<LinkCard
+  title="Launch Anycast Lab"
+  description="Open the full browser workspace. Your projects autosave locally."
+  href="/lab/"
+/>
+
+<Aside type="note" title="Runtime fidelity">
+The lab always identifies the selected runtime. **SIM** is the fast,
+deterministic compatibility engine. **NATIVE VM** runs real i686 BIRD and FRR
+binaries inside an isolated Linux guest powered by the browser's v86/WebAssembly
+emulator. Native mode never silently falls back to SIM. Native files are
+preserved unchanged in either mode.
+</Aside>
+
+<Aside type="tip" title="FRR protocol daemons">
+If an FRR project omits `/etc/frr/daemons`, native mode supplies a conservative
+BGP-only activation file. Add your normal `/etc/frr/daemons` to enable the
+packaged OSPF, IS-IS, BFD, RIP, Babel, or PIM daemons. The lab passes a supplied
+file through unchanged. While native VMs are running or paused, configuration
+and topology edits are locked so the saved project cannot drift away from what
+the daemons actually tested; reset the runtime before editing.
+</Aside>
+
+## First experiment
+
+<Steps>
+1. **Run the included topology**
+
+   The starter project contains a client, an example transit, BIRD and FRR PoPs,
+   and two endpoints using the same anycast address.
+
+2. **Choose the fidelity**
+
+   Keep **SIM** for a quick guided exercise, or select **NATIVE VM** when the
+   deployment includes the verified Linux image. The selector shows the total
+   VM memory estimate before startup.
+
+3. **Inspect the protocol state**
+
+   In SIM, try `show protocols`, `show route`, or `show bgp summary`. In native
+   mode the terminal is a real Linux serial shell: use `birdc show protocols`
+   or `vtysh -c "show bgp summary"`.
+
+4. **Trace the anycast address**
+
+   Open **Packet trace**, select the Seoul client, enter `203.0.113.53`, and run
+   the trace. SIM explains every forwarding decision and cumulative link
+   delay. Native mode runs `traceroute` in the Linux client and can export the
+   byte-exact fabric capture as PCAPNG.
+
+5. **Fail a PoP path**
+
+   Select a link, switch its state off, and converge the lab again. Compare the
+   protocol event timeline and the new packet path.
+
+6. **Export the project**
+
+   The `.anycastlab` archive includes the topology and exact appliance file
+   trees. It can be imported again without an account or server.
+</Steps>
+
+## Local data
+
+Projects are stored in this browser using IndexedDB. Browser storage can be
+cleared by the user or operating system, so export important projects
+periodically. Configuration and topology data are never sent to anycast.guide.
+
+The lab is open source in the
+[anycast_lab repository](https://github.com/junepark678/anycast_lab).

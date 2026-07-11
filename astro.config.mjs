@@ -53,6 +53,13 @@ export default defineConfig({
           },
           sidebar: [
               {
+                  label: 'Interactive Lab',
+                  items: [
+                      { label: 'Open Anycast Lab', link: '/lab/' },
+                      { label: 'Lab Guide', slug: 'lab/about' },
+                  ],
+              },
+              {
                   label: 'Getting Started',
                   items: [
                       { label: 'What is Anycast?', slug: 'getting-started/what-is-anycast' },

@@ -13,6 +13,10 @@ hero:
       link: /guides/bird-setup/
       icon: open-book
       variant: minimal
+    - text: Try the Lab
+      link: /lab/
+      icon: rocket
+      variant: minimal
 ---
 
 import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
@@ -45,6 +49,11 @@ Anycast routing enables you to serve users from the nearest location automatical
   <Card title="Reference Documentation" icon="open-book">
     BGP community guides, troubleshooting tips, and best practices for operating your anycast network.
     [Browse reference →](/reference/bgp-attributes/)
+  </Card>
+  <Card title="Interactive Anycast Lab" icon="rocket">
+    Build a multi-PoP topology, edit BIRD and FRR configurations, simulate
+    failures and trace packets—all locally in your browser.
+    [Open the lab →](/lab/)
   </Card>
 </CardGrid>
 
