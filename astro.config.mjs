@@ -55,8 +55,8 @@ export default defineConfig({
               {
                   label: 'Interactive Lab',
                   items: [
-                      { label: 'Open Anycast Lab', link: '/lab/' },
-                      { label: 'Lab Guide', slug: 'lab/about' },
+                      { label: 'Follow along in Lab', slug: 'lab/about' },
+                      { label: 'Full-screen workspace', link: '/lab/' },
                   ],
               },
               {

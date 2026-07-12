@@ -1,0 +1,237 @@
+---
+const steps = [
+  {
+    id: 'run',
+    target: 'run',
+    title: 'Run the included topology',
+    detail: 'Start in SIM and converge the client, transit, BIRD and FRR PoPs, and both anycast endpoints.',
+  },
+  {
+    id: 'runtime',
+    target: 'runtime',
+    title: 'Choose the fidelity',
+    detail: 'Keep SIM for the guided pass, or choose NATIVE VM to boot the verified Linux image and real routing daemons.',
+  },
+  {
+    id: 'protocols',
+    target: 'console',
+    title: 'Inspect protocol state',
+    detail: 'Use show protocols or show bgp summary in SIM; use birdc or vtysh from a native appliance shell.',
+  },
+  {
+    id: 'trace',
+    target: 'trace',
+    title: 'Trace the anycast address',
+    detail: 'Trace from the Seoul client to 203.0.113.53 and compare every forwarding decision and accumulated delay.',
+  },
+  {
+    id: 'failure',
+    target: 'topology',
+    title: 'Fail a PoP path',
+    detail: 'Right-click a link, disable it, reconverge, and compare the new packet path with the original.',
+  },
+  {
+    id: 'export',
+    target: 'export',
+    title: 'Export the project',
+    detail: 'Save the topology and exact appliance file trees as a portable .anycastlab archive.',
+  },
+] as const;
+---
+
+<section
+  id="first-experiment"
+  class="lab-follow-along"
+  aria-labelledby="lab-follow-along-title"
+  data-lab-follow-along
+  data-storage-key="anycast-guide:lab-first-experiment:v1"
+>
+  <header class="lab-follow-along__header">
+    <div>
+      <span class="lab-follow-along__eyebrow">Interactive exercise</span>
+      <h2 id="lab-follow-along-title">Anycast Lab follow-along</h2>
+      <p>Work in the live topology without leaving the guide. Everything stays in this browser.</p>
+    </div>
+    <a class="lab-follow-along__open" href="/lab/" target="_blank" rel="noreferrer">Open full workspace <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <div class="lab-follow-along__grid">
+    <div class="lab-follow-along__frame">
+      <div class="lab-follow-along__framebar">
+        <span><i></i><i></i><i></i></span>
+        <strong>Local workspace</strong>
+        <small>autosaves to IndexedDB</small>
+      </div>
+      <iframe
+        src="/lab/?embed=guide"
+        title="Anycast Lab follow-along workspace"
+        loading="eager"
+        allow="clipboard-write; fullscreen"
+      ></iframe>
+    </div>
+
+    <aside class="lab-follow-along__lesson" aria-labelledby="lab-follow-along-progress">
+      <header>
+        <div>
+          <span>First experiment</span>
+          <strong id="lab-follow-along-progress" data-progress-count aria-live="polite">0 of {steps.length} complete</strong>
+        </div>
+        <button type="button" data-reset-progress>Reset progress</button>
+      </header>
+      <progress value="0" max={steps.length} aria-label="Follow-along progress"></progress>
+      <ol>
+        {steps.map((step, index) => (
+          <li data-step-item={step.id}>
+            <label>
+              <input type="checkbox" value={step.id} aria-label={`Mark ${step.title} complete`} data-step-checkbox />
+              <span class="lab-follow-along__number">{String(index + 1).padStart(2, '0')}</span>
+              <span><strong>{step.title}</strong><small>{step.detail}</small></span>
+            </label>
+            <button type="button" data-focus-step={step.target} aria-label={`Show ${step.title} in lab`}>Show in lab</button>
+          </li>
+        ))}
+      </ol>
+      <p class="lab-follow-along__privacy"><span aria-hidden="true">●</span> No account, upload, or server-side project state.</p>
+    </aside>
+  </div>
+</section>
+
+<script>
+  const initializeFollowAlong = (region: HTMLElement) => {
+    const storageKey = region.dataset.storageKey ?? '';
+    const checkboxes = [...region.querySelectorAll<HTMLInputElement>('[data-step-checkbox]')];
+    const count = region.querySelector<HTMLElement>('[data-progress-count]');
+    const progress = region.querySelector<HTMLProgressElement>('progress');
+    const frame = region.querySelector<HTMLIFrameElement>('iframe');
+    let activeTarget = 'run';
+
+    const saveAndRender = () => {
+      const complete = checkboxes.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+      if (count) count.textContent = `${complete.length} of ${checkboxes.length} complete`;
+      if (progress) progress.value = complete.length;
+      try { localStorage.setItem(storageKey, JSON.stringify(complete)); } catch { /* Progress remains usable for this page view. */ }
+    };
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+      if (Array.isArray(saved)) {
+        for (const checkbox of checkboxes) checkbox.checked = saved.includes(checkbox.value);
+      }
+    } catch { /* Ignore malformed or unavailable local storage. */ }
+    saveAndRender();
+
+    for (const checkbox of checkboxes) checkbox.addEventListener('change', saveAndRender);
+    region.querySelector<HTMLButtonElement>('[data-reset-progress]')?.addEventListener('click', () => {
+      for (const checkbox of checkboxes) checkbox.checked = false;
+      saveAndRender();
+    });
+
+    const focusInLab = (target: string) => {
+      activeTarget = target;
+      for (const button of region.querySelectorAll<HTMLButtonElement>('[data-focus-step]')) {
+        if (button.dataset.focusStep === target) button.setAttribute('aria-current', 'step');
+        else button.removeAttribute('aria-current');
+      }
+      frame?.contentWindow?.postMessage({ type: 'anycast-guide:focus', target }, window.location.origin);
+    };
+
+    for (const button of region.querySelectorAll<HTMLButtonElement>('[data-focus-step]')) {
+      button.addEventListener('click', () => focusInLab(button.dataset.focusStep ?? 'run'));
+    }
+    frame?.addEventListener('load', () => focusInLab(activeTarget));
+    window.addEventListener('message', (event) => {
+      if (event.origin === window.location.origin && event.source === frame?.contentWindow && event.data?.type === 'anycast-lab:ready') {
+        focusInLab(activeTarget);
+      }
+    });
+  };
+
+  for (const region of document.querySelectorAll<HTMLElement>('[data-lab-follow-along]')) initializeFollowAlong(region);
+</script>
+
+<style>
+  .lab-follow-along {
+    --follow-width: min(1460px, calc(100vw - var(--sl-sidebar-width, 0px) - 3rem));
+    container: lab-follow / inline-size;
+    width: var(--follow-width);
+    margin: 2rem 0 2.5rem calc((100% - var(--follow-width)) / 2);
+    overflow: hidden;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: .85rem;
+    background: #101217;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .24);
+    color: #e9e9ed;
+    font-family: var(--sl-font-system);
+  }
+
+  .lab-follow-along__header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.15rem 1.25rem;
+    border-bottom: 1px solid #292d35;
+    background: linear-gradient(120deg, #181b21, #121419 60%, #18251f);
+  }
+  .lab-follow-along__header h2 { margin: .12rem 0 .2rem; color: #fff; font-size: clamp(1.2rem, 2vw, 1.65rem); line-height: 1.2; }
+  .lab-follow-along__header p { margin: 0; color: #aeb3bd; font-size: .82rem; }
+  .lab-follow-along__eyebrow { color: #9bd8bd; font-size: .66rem; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+  .lab-follow-along__open { flex: 0 0 auto; padding: .55rem .7rem; border: 1px solid #46505b; border-radius: .4rem; color: #e9e9ed; font-size: .75rem; font-weight: 700; text-decoration: none; }
+  .lab-follow-along__open:hover { border-color: #79baa0; color: #9bd8bd; }
+
+  .lab-follow-along__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 350px); min-height: 0; }
+  .lab-follow-along__frame { min-width: 0; border-right: 1px solid #292d35; background: #0c0d10; }
+  .lab-follow-along__framebar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 32px; padding: 0 .7rem; border-bottom: 1px solid #292d35; color: #9298a5; font-size: .64rem; }
+  .lab-follow-along__framebar > span { display: flex; gap: 5px; }
+  .lab-follow-along__framebar i { width: 7px; height: 7px; border-radius: 50%; background: #48505c; }
+  .lab-follow-along__framebar i:nth-child(2) { background: #6e75a8; }
+  .lab-follow-along__framebar i:nth-child(3) { background: #79baa0; }
+  .lab-follow-along__framebar strong { color: #cfd2d8; font-size: .65rem; letter-spacing: .04em; }
+  .lab-follow-along__framebar small { justify-self: end; }
+  .lab-follow-along iframe { display: block; width: 100%; height: clamp(640px, 76vh, 860px); border: 0; background: #0c0d10; }
+
+  .lab-follow-along__lesson { min-width: 0; background: #15171c; }
+  .lab-follow-along__lesson > header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem .9rem .65rem; }
+  .lab-follow-along__lesson > header div { display: flex; flex-direction: column; gap: .05rem; }
+  .lab-follow-along__lesson > header span { color: #e9e9ed; font-size: .78rem; font-weight: 750; }
+  .lab-follow-along__lesson > header strong { color: #9298a5; font-size: .66rem; font-weight: 550; }
+  .lab-follow-along__lesson > header button, .lab-follow-along__lesson li > button { padding: .3rem .42rem; border: 0; border-radius: .3rem; background: transparent; color: #9bd8bd; cursor: pointer; font: inherit; font-size: .62rem; font-weight: 700; }
+  .lab-follow-along__lesson > header button:hover, .lab-follow-along__lesson li > button:hover { background: #253329; }
+  .lab-follow-along__lesson progress { display: block; width: calc(100% - 1.8rem); height: 3px; margin: 0 .9rem .55rem; border: 0; accent-color: #79baa0; }
+  .lab-follow-along__lesson progress::-webkit-progress-bar { background: #292d35; }
+  .lab-follow-along__lesson progress::-webkit-progress-value { background: #79baa0; }
+  .lab-follow-along__lesson ol { margin: 0; padding: 0 .6rem; list-style: none; }
+  .lab-follow-along__lesson li { padding: .42rem .3rem .5rem; border-bottom: 1px solid #292d35; }
+  .lab-follow-along__lesson li label { display: grid; grid-template-columns: 16px 25px minmax(0, 1fr); gap: .4rem; align-items: start; cursor: pointer; }
+  .lab-follow-along__lesson li input { width: 14px; height: 14px; margin-top: .13rem; accent-color: #79baa0; }
+  .lab-follow-along__number { color: #79baa0; font-family: var(--sl-font-system-mono); font-size: .65rem; line-height: 1.55; }
+  .lab-follow-along__lesson li label > span:last-child { display: flex; flex-direction: column; gap: .12rem; }
+  .lab-follow-along__lesson li strong { color: #e2e4e9; font-size: .72rem; line-height: 1.35; }
+  .lab-follow-along__lesson li small { color: #9298a5; font-size: .65rem; line-height: 1.42; }
+  .lab-follow-along__lesson li > button { margin: .22rem 0 0 3.45rem; }
+  .lab-follow-along__lesson li > button[aria-current='step'] { background: #253329; color: #b7ead2; }
+  .lab-follow-along__lesson li:has(input:checked) strong { color: #9bd8bd; text-decoration: line-through; text-decoration-color: #597b6d; }
+  .lab-follow-along__privacy { margin: .75rem .9rem 1rem; color: #7f8590; font-size: .62rem; }
+  .lab-follow-along__privacy span { color: #79baa0; }
+
+  @media (max-width: 72rem) {
+    .lab-follow-along { --follow-width: min(100%, calc(100vw - 2rem)); }
+  }
+  @container lab-follow (max-width: 760px) {
+    .lab-follow-along__grid { grid-template-columns: minmax(0, 1fr); }
+    .lab-follow-along__frame { border-right: 0; border-bottom: 1px solid #292d35; }
+    .lab-follow-along iframe { height: min(720px, 76vh); min-height: 600px; }
+  }
+  @media (max-width: 52rem) {
+    .lab-follow-along__grid { grid-template-columns: minmax(0, 1fr); }
+    .lab-follow-along__frame { border-right: 0; border-bottom: 1px solid #292d35; }
+    .lab-follow-along iframe { height: min(720px, 76vh); min-height: 600px; }
+  }
+  @media (max-width: 34rem) {
+    .lab-follow-along { --follow-width: calc(100vw - 1rem); border-radius: .55rem; }
+    .lab-follow-along__header { align-items: start; flex-direction: column; padding: .9rem; }
+    .lab-follow-along__framebar small { display: none; }
+    .lab-follow-along__framebar { grid-template-columns: 1fr auto; }
+    .lab-follow-along iframe { min-height: 560px; }
+  }
+</style>
